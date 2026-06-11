@@ -1,0 +1,24 @@
+name: ZanoriaLobby
+version: '1.0-SNAPSHOT'
+main: net.zanoria.lobby.ZanoriaLobby
+api-version: '1.21'
+softdepend:
+  - Nexus
+
+commands:
+  lobbynpc:
+    description: Verwaltet Lobby Queue NPCs
+    usage: /lobbynpc <set|list|reload>
+    permission: zanoria.lobby.npc
+    permission-message: Du hast keine Berechtigung.
+  builder:
+    description: Betritt den Builder-Server oder verwalte die Builder-Liste
+    usage: /builder [add|remove|list] [name]
+
+permissions:
+  zanoria.lobby.npc:
+    description: Erlaubt das Verwalten von Lobby NPCs
+    default: op
+  zanoria.admin:
+    description: Erlaubt Builder-Verwaltung und andere Admin-Befehle
+    default: op

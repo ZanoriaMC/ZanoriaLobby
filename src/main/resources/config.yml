@@ -1,0 +1,28 @@
+spawn:
+  world: world
+  x: 0.5
+  y: 64.0
+  z: 0.5
+  yaw: 0.0
+  pitch: 0.0
+
+relicwarsnpc:
+  queue: relicwars1v1
+  skin: corwis
+  name: "RelicWars"
+  world: world
+  x: 0.5
+  y: 64.0
+  z: 0.5
+  yaw: 0.0
+  pitch: 0.0
+
+builder:
+  velocity-server-name: "builder-1"
+  pelican-url: "http://49.13.1.183:8080"
+  api-key: ""
+  server-uuid: ""
+  redis:
+    host: "172.18.0.1"
+    port: 6379
+    password: ""
