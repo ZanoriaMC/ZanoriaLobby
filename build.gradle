@@ -14,10 +14,28 @@ repositories {
     }
 }
 
+def ideaProjectsRoot = providers.environmentVariable("IDEA_PROJECTS_DIR")
+        .orElse(System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("windows")
+                ? "C:/Users/krinc/IdeaProjects"
+                : "/mnt/c/Users/krinc/IdeaProjects")
+        .get()
+
+def firstExistingFile(List<String> candidates) {
+    def match = candidates.collect { file(it) }.find { it.exists() }
+    return match != null ? match : file(candidates.first())
+}
+
 dependencies {
     compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
-    compileOnly(files("C:/Users/krinc/IdeaProjects/Nexus/build/libs/Nexus-1.0-SNAPSHOT.jar"))
-    compileOnly(files("C:/Users/krinc/IdeaProjects/RelicWars/run/plugins/ZanLang-1.0.jar"))
+    compileOnly(files(firstExistingFile([
+            "${ideaProjectsRoot}/Nexus/build/libs/Nexus-1.0-SNAPSHOT.jar",
+            "/home/corwis/zanoria/apps/Nexus.jar"
+    ])))
+    compileOnly(files(firstExistingFile([
+            "${ideaProjectsRoot}/ZanLang/build/libs/Corox Lang-1.0.jar",
+            "${ideaProjectsRoot}/RelicWars/run/plugins/ZanLang-1.0.jar",
+            "/home/corwis/zanoria/apps/ZanLang.jar"
+    ])))
     implementation 'redis.clients:jedis:5.1.3'
 }
 
@@ -25,6 +43,14 @@ shadowJar {
     relocate 'redis.clients', 'net.zanoria.lobby.libs.jedis'
     relocate 'org.apache.commons.pool2', 'net.zanoria.lobby.libs.pool2'
     archiveClassifier.set('')
+}
+
+jar {
+    archiveClassifier.set('plain')
+}
+
+build {
+    dependsOn shadowJar
 }
 
 java {

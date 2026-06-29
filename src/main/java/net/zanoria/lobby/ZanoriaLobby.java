@@ -92,15 +92,16 @@ public final class ZanoriaLobby extends JavaPlugin implements Listener {
         // ── Builder subsystem ───────────────────────────────────────────────
         getServer().getMessenger().registerOutgoingPluginChannel(this, "BungeeCord");
 
-        String redisHost  = getConfig().getString("builder.redis.host", "172.18.0.1");
-        int    redisPort  = getConfig().getInt("builder.redis.port", 6379);
-        String redisPw    = getConfig().getString("builder.redis.password", "");
+        String redisHost = environmentOrConfig("ZANORIA_REDIS_HOST", "builder.redis.host", "172.18.0.1");
+        int redisPort = Integer.parseInt(environmentOrConfig("ZANORIA_REDIS_PORT", "builder.redis.port", "6379"));
+        String redisUser = environmentOrConfig("ZANORIA_REDIS_USERNAME", "builder.redis.username", "default");
+        String redisPw = environmentOrConfig("ZANORIA_REDIS_PASSWORD", "builder.redis.password", "");
         String pelicanUrl = getConfig().getString("builder.pelican-url", "");
         String apiKey     = getConfig().getString("builder.api-key", "");
         String uuid       = getConfig().getString("builder.server-uuid", "");
         String velServer  = getConfig().getString("builder.velocity-server-name", "builder-1");
 
-        builderRedis = new BuilderRedisClient(redisHost, redisPort, redisPw);
+        builderRedis = new BuilderRedisClient(redisHost, redisPort, redisUser, redisPw);
         try {
             builderRedis.connect();
             getSLF4JLogger().info("Builder Redis connected.");
@@ -165,6 +166,11 @@ public final class ZanoriaLobby extends JavaPlugin implements Listener {
             return null;
         }
         return nexus.getQueueService();
+    }
+
+    private String environmentOrConfig(String environment, String path, String fallback) {
+        String value = System.getenv(environment);
+        return value == null || value.isBlank() ? getConfig().getString(path, fallback) : value;
     }
 
     private void loadNpcDefinitions() {
@@ -312,16 +318,25 @@ public final class ZanoriaLobby extends JavaPlugin implements Listener {
     }
 
     private void joinQueue(Player player, QueueNpcDefinition npc) {
-        if (sendQueueRequest(player, npc)) {
-            return;
-        }
         UUID playerId = player.getUniqueId();
 
         // Bereits in einer Queue → verlassen
         if (queueService.isQueued(playerId)) {
+            if (sendQueueRequest(player, npc, false)) {
+                hideQueueBar(player);
+                t(player, "lobby.queue.left").send();
+                updateBossBars();
+                return;
+            }
             queueService.leave(playerId);
             hideQueueBar(player);
             t(player, "lobby.queue.left").send();
+            updateBossBars();
+            return;
+        }
+
+        if (sendQueueRequest(player, npc, true)) {
+            showQueueBar(player);
             updateBossBars();
             return;
         }
@@ -340,7 +355,7 @@ public final class ZanoriaLobby extends JavaPlugin implements Listener {
         updateBossBars();
     }
 
-    private boolean sendQueueRequest(Player player, QueueNpcDefinition npc) {
+    private boolean sendQueueRequest(Player player, QueueNpcDefinition npc, boolean joining) {
         try {
             ByteArrayOutputStream bytes = new ByteArrayOutputStream();
             try (DataOutputStream output = new DataOutputStream(bytes)) {
@@ -348,12 +363,16 @@ public final class ZanoriaLobby extends JavaPlugin implements Listener {
                 output.writeUTF(npc.hasMap() ? npc.mapId() : "");
             }
             player.sendPluginMessage(this, QUEUE_CHANNEL, bytes.toByteArray());
-            var message = t(player, "lobby.queue.joined")
-                    .variable("type", npc.queueType().getDisplayName());
-            if (npc.hasMap()) {
-                message.variable("map", npc.mapId());
+            if (joining) {
+                var message = t(player, "lobby.queue.joined")
+                        .variable("type", npc.queueType().getDisplayName());
+                if (npc.hasMap()) {
+                    message.variable("map", npc.mapId());
+                }
+                message.send();
+            } else {
+                t(player, "lobby.queue.left").send();
             }
-            message.send();
             return true;
         } catch (Exception exception) {
             getSLF4JLogger().warn("Could not send queue request to Velocity: {}", exception.getMessage());

@@ -1,6 +1,8 @@
 package net.zanoria.lobby.builder;
 
 import redis.clients.jedis.Jedis;
+import redis.clients.jedis.DefaultJedisClientConfig;
+import redis.clients.jedis.HostAndPort;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
 
@@ -19,12 +21,14 @@ public final class BuilderRedisClient {
 
     private final String host;
     private final int    port;
+    private final String username;
     private final String password;
     private JedisPool pool;
 
-    public BuilderRedisClient(String host, int port, String password) {
+    public BuilderRedisClient(String host, int port, String username, String password) {
         this.host     = host;
         this.port     = port;
+        this.username = username;
         this.password = password;
     }
 
@@ -35,9 +39,12 @@ public final class BuilderRedisClient {
         cfg.setMinIdle(1);
         cfg.setTestOnBorrow(true);
         cfg.setMinEvictableIdleDuration(Duration.ofSeconds(60));
-        pool = (password != null && !password.isBlank())
-                ? new JedisPool(cfg, host, port, 2000, password)
-                : new JedisPool(cfg, host, port, 2000);
+        DefaultJedisClientConfig.Builder client = DefaultJedisClientConfig.builder()
+                .connectionTimeoutMillis(2000)
+                .socketTimeoutMillis(2000);
+        if (username != null && !username.isBlank()) client.user(username);
+        if (password != null && !password.isBlank()) client.password(password);
+        pool = new JedisPool(cfg, new HostAndPort(host, port), client.build());
         try (Jedis j = pool.getResource()) { j.ping(); }
     }
 
