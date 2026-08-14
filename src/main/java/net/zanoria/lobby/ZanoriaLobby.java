@@ -76,7 +76,7 @@ public final class ZanoriaLobby extends JavaPlugin implements Listener {
 
         loadNpcDefinitions();
         removeSpawnedQueueNpcs();
-        spawnQueueNpcs();
+        int npcsGesetzt = spawnQueueNpcs();
         getServer().getPluginManager().registerEvents(this, this);
         bossBarTask = getServer().getScheduler().runTaskTimer(this, this::updateBossBars, 20L, 20L);
 
@@ -87,7 +87,16 @@ public final class ZanoriaLobby extends JavaPlugin implements Listener {
             cmd.setTabCompleter(npcCommand);
         }
 
-        getSLF4JLogger().info("ZanoriaLobby enabled with {} queue NPC(s).", npcs.size());
+        // ⚠️ GESETZT, nicht npcs.size(). Die alte Fassung meldete die Konfigurationseintraege
+        // und stand am 2026-08-13 auf "7", waehrend im Spiel kein einziger NPC existierte.
+        if (npcsGesetzt < npcs.size()) {
+            getSLF4JLogger().error(
+                    "ZanoriaLobby: nur {} von {} Queue-NPCs gesetzt - die uebrigen fehlen im Spiel."
+                            + " Ursache steht in den Zeilen darueber.",
+                    npcsGesetzt, npcs.size());
+        } else {
+            getSLF4JLogger().info("ZanoriaLobby enabled with {} queue NPC(s) gesetzt.", npcsGesetzt);
+        }
 
         // ── Builder subsystem ───────────────────────────────────────────────
         getServer().getMessenger().registerOutgoingPluginChannel(this, "BungeeCord");
@@ -231,19 +240,61 @@ public final class ZanoriaLobby extends JavaPlugin implements Listener {
         return configured;
     }
 
-    private void spawnQueueNpcs() {
+    /**
+     * Setzt die Warteschlangen-NPCs und liefert zurück, wie viele davon
+     * <b>wirklich entstanden sind</b>.
+     *
+     * <p>⚠️ <b>Der Rückgabewert ist der eigentliche Fix, nicht das try/catch.</b> Vorher meldete
+     * der Aufrufer {@code npcs.size()} — also die Zahl der <em>Konfigurationseinträge</em>. Am
+     * 2026-08-13 stand deshalb <i>"enabled with 7 queue NPC(s)"</i> im Log, während im Spiel
+     * <b>kein einziges Objekt existierte</b> ({@code execute if entity @e[tag=…]} fand nichts).
+     * Eine Zählung, die zählt, was sie hineingesteckt hat statt was herauskam, meldet Erfolg
+     * unabhängig vom Ergebnis.</p>
+     *
+     * <p>⚠️ Dieselbe Form wie in {@code PlayerManager.onPreLogin}: dort verschluckte ein
+     * {@code catch (Exception)} ohne Logausgabe die Ursache eines Login-Abbruchs. Hier war es
+     * eine Schleife ganz ohne {@code catch} — wirft der erste Aufruf, entstehen auch alle
+     * folgenden nicht, und niemand erfährt warum.</p>
+     */
+    private int spawnQueueNpcs() {
         EntityType type = io.papermc.paper.registry.RegistryAccess.registryAccess()
                 .getRegistry(io.papermc.paper.registry.RegistryKey.ENTITY_TYPE)
                 .get(net.kyori.adventure.key.Key.key("minecraft", "mannequin"));
         if (type == null) type = EntityType.ARMOR_STAND;
 
+        // ⚠️ ZUERST AUFRAEUMEN, DANN SETZEN. Bis 2026-08-14 trugen die NPCs
+        // setPersistent(false) - damit werden sie beim Speichern der Welt verworfen, und im
+        // Spiel stand keiner, waehrend das Log "6 gesetzt" meldete. Der Grund fuer das Flag war
+        // richtig (sonst haeuft jeder Neustart Duplikate an), die Folge war es nicht.
+        // Jetzt bleiben sie bestehen, und die Duplikate verhindert dieser Durchgang.
+        int entfernt = 0;
         for (QueueNpcDefinition npc : npcs.values()) {
+            World welt = npc.location().getWorld();
+            if (welt == null) {
+                continue;
+            }
+            for (Entity vorhanden : welt.getEntities()) {
+                if (vorhanden.getScoreboardTags().contains(NPC_TAG)) {
+                    vorhanden.remove();
+                    entfernt++;
+                }
+            }
+            break; // alle NPCs liegen in derselben Welt; ein Durchgang genuegt
+        }
+        if (entfernt > 0) {
+            getSLF4JLogger().info("{} alte Queue-NPC(s) entfernt, bevor neu gesetzt wird.", entfernt);
+        }
+
+        int gesetzt = 0;
+        for (QueueNpcDefinition npc : npcs.values()) {
+            try {
             Entity entity = npc.location().getWorld().spawnEntity(npc.location(), type);
             entity.addScoreboardTag(NPC_TAG);
             entity.addScoreboardTag(QUEUE_TAG_PREFIX + npc.id());
             entity.customName(Component.text(npc.name(), NamedTextColor.AQUA));
             entity.setCustomNameVisible(true);
-            entity.setPersistent(false);
+            // ⚠️ KEIN setPersistent(false). Siehe den Aufraeum-Durchgang oben: das Flag hat die
+            // NPCs beim ersten Speichern der Welt verworfen.
 
             if (entity instanceof LivingEntity living) {
                 living.setInvulnerable(true);
@@ -258,7 +309,38 @@ public final class ZanoriaLobby extends JavaPlugin implements Listener {
                 armorStand.setBasePlate(false);
                 armorStand.setVisible(false);
             }
+
+            // ⚠️ NACHSEHEN, NICHT DEM RUECKGABEWERT GLAUBEN. "spawnEntity kam zurueck" heisst
+            // noch nicht "das Wesen existiert": am 2026-08-14 meldete diese Schleife sechs
+            // gesetzte NPCs, waehrend die Welt nachweislich weder ein mannequin noch einen
+            // armor_stand enthielt. Gezaehlt wird deshalb erst, wenn die Welt das Wesen
+            // zurueckgibt - das ist der Unterschied zwischen "gesetzt" und "vorhanden".
+            World welt = npc.location().getWorld();
+            boolean vorhanden = entity.isValid()
+                    && welt != null
+                    && welt.getEntity(entity.getUniqueId()) != null;
+            if (vorhanden) {
+                gesetzt++;
+            } else {
+                getSLF4JLogger().error(
+                        "Queue-NPC '{}' wurde gesetzt, ist danach aber nicht in der Welt"
+                                + " (valid={}, von der Welt gefunden={}). Er wird im Spiel fehlen.",
+                        npc.id(), entity.isValid(),
+                        welt != null && welt.getEntity(entity.getUniqueId()) != null);
+            }
+            } catch (Exception fehler) {
+                // ⚠️ Je NPC fangen, nicht um die ganze Schleife: sonst nimmt der erste
+                // Fehlschlag alle folgenden mit, und im Log steht nichts darueber.
+                Location ort = npc.location();
+                getSLF4JLogger().error(
+                        "Queue-NPC '{}' konnte nicht gesetzt werden (Welt={} x={} y={} z={}, Typ={})",
+                        npc.id(),
+                        ort.getWorld() != null ? ort.getWorld().getName() : "?",
+                        ort.getX(), ort.getY(), ort.getZ(), type,
+                        fehler);
+            }
         }
+        return gesetzt;
     }
 
     private void applyArmorStandSkin(LivingEntity entity, String skin) {
@@ -604,11 +686,21 @@ public final class ZanoriaLobby extends JavaPlugin implements Listener {
             reloadConfig();
             removeSpawnedQueueNpcs();
             loadNpcDefinitions();
-            spawnQueueNpcs();
+            // ⚠️ Dieselbe Falle wie beim Start: gemeldet wird, was GESETZT wurde, nicht was in
+            // der Konfiguration steht. Sonst bestaetigt /lobbynpc reload einen Erfolg, den der
+            // Ausfuehrende danach im Spiel vergeblich sucht.
+            int gesetzt = spawnQueueNpcs();
             if (sender instanceof Player player) {
-                t(player, "lobby.npc.reload").variable("count", String.valueOf(npcs.size())).send();
+                t(player, "lobby.npc.reload").variable("count", String.valueOf(gesetzt)).send();
+                if (gesetzt < npcs.size()) {
+                    player.sendMessage(Component.text(
+                            "⚠ Nur " + gesetzt + " von " + npcs.size()
+                                    + " NPCs gesetzt - Ursache steht in der Serverkonsole.",
+                            NamedTextColor.RED));
+                }
             } else {
-                sender.sendMessage(Component.text("NPCs reloaded (" + npcs.size() + ")."));
+                sender.sendMessage(Component.text(
+                        "NPCs reloaded (" + gesetzt + " von " + npcs.size() + " gesetzt)."));
             }
             return true;
         }

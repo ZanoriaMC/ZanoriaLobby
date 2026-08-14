@@ -27,52 +27,12 @@ npcs:
     z: 0.5
     yaw: 0.0
     pitch: 0.0
-  relicwars_3v3v3v3:
-    queue: RELICWARS_4X3
-    skin: corwis
-    name: "RelicWars 3v3v3v3"
-    world: world
-    x: -2.5
-    y: 64.0
-    z: 0.5
-    yaw: 0.0
-    pitch: 0.0
   relicwars_4v4v4v4:
     queue: RELICWARS_4X4
     skin: corwis
     name: "RelicWars 4v4v4v4"
     world: world
     x: -0.5
-    y: 64.0
-    z: 0.5
-    yaw: 0.0
-    pitch: 0.0
-  showdown_solo:
-    queue: SHOWDOWN_SOLO
-    skin: corwis
-    name: "Showdown Solo"
-    world: world
-    x: 1.5
-    y: 64.0
-    z: 0.5
-    yaw: 0.0
-    pitch: 0.0
-  showdown_duo:
-    queue: SHOWDOWN_DUO
-    skin: corwis
-    name: "Showdown Duo"
-    world: world
-    x: 3.5
-    y: 64.0
-    z: 0.5
-    yaw: 0.0
-    pitch: 0.0
-  showdown_4er:
-    queue: SHOWDOWN_4ER
-    skin: corwis
-    name: "Showdown 4er"
-    world: world
-    x: 5.5
     y: 64.0
     z: 0.5
     yaw: 0.0
