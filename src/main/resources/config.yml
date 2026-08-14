@@ -45,5 +45,6 @@ builder:
   server-uuid: ""
   redis:
     host: "172.18.0.1"
-    port: 6379
+    # ⚠️ 6380 - siehe Nexus/config.yml. 6379 ist eine zweite, leere Instanz; beide lauschen.
+    port: 6380
     password: ""
