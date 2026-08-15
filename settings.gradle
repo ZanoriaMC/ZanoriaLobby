@@ -1,1 +1,18 @@
 rootProject.name = 'ZanoriaLobby'
+
+// ⚠️ KEIN includeBuild fuer ZanLang - und das ist gemessen, nicht vergessen.
+// Versucht am 2026-08-15: der zusammengesetzte Bau zieht ZanLangs eigenen
+// Plugin-Klassenpfad mit, und dessen paperweight-userdev 2.0.0-beta.17 laesst sich
+// hier nicht aufloesen (Gradle 8.8, --offline):
+//   > Could not resolve all dependencies for configuration ':ZanLang:classpath'.
+// ZanLang wird deshalb ueber die KOORDINATE aus mavenLocal bezogen -
+// net.zanoria:zanlang:1.0, veroeffentlicht mit publishToMavenLocal.
+//
+// ⚠️ Damit gilt hier dieselbe Gefahr wie bei zanoria-common vor der Substitution:
+// ein veraltetes Jar in mavenLocal uebersetzt gruen. Wer ZanLang aendert, muss
+// publishToMavenLocal fahren; dieser Bau merkt es nicht.
+//
+// Der Weg ueber die Koordinate ist trotzdem der bessere: vorher hing dieses Repo
+// an "ZanLang/build/libs/Corox Lang-1.0.jar" - einem Dateinamen MIT Leerzeichen,
+// hinter einer firstExistingFile-Kette, die bei Wegfall stillschweigend auf ein
+// beliebig altes Jar aus RelicWars/run/plugins zurueckfiel.

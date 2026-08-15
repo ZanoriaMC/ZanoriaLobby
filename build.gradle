@@ -7,6 +7,9 @@ group = 'net.zanoria'
 version = '1.0-SNAPSHOT'
 
 repositories {
+    // ⚠️ mavenLocal fuer net.zanoria:zanlang:1.0 - siehe settings.gradle.
+    // ZanLang laesst sich hier nicht als includeBuild einbinden (paperweight).
+    mavenLocal()
     mavenCentral()
     maven {
         name = "papermc-repo"
@@ -31,11 +34,18 @@ dependencies {
             "${ideaProjectsRoot}/Nexus/build/libs/Nexus-1.0-SNAPSHOT.jar",
             "/home/corwis/zanoria/apps/Nexus.jar"
     ])))
-    compileOnly(files(firstExistingFile([
-            "${ideaProjectsRoot}/ZanLang/build/libs/Corox Lang-1.0.jar",
-            "${ideaProjectsRoot}/RelicWars/run/plugins/ZanLang-1.0.jar",
-            "/home/corwis/zanoria/apps/ZanLang.jar"
-    ])))
+    // ⚠️ Ueber die KOORDINATE, nicht ueber einen Dateipfad. Hier stand eine
+    // firstExistingFile-Kette auf "Corox Lang-1.0.jar" mit zwei Rueckfaellen.
+    // Zwei Schaeden daran, beide am 2026-08-15 belegt:
+    //   1. Der Dateiname traegt ein LEERZEICHEN (alter rootProject.name 'Corox Lang').
+    //      Genau daran hat der Deploy-Waechter ZanLang abgelehnt.
+    //   2. Die Rueckfallkette maskiert den Bruch: faellt Position 1 weg, greift
+    //      STILLSCHWEIGEND RelicWars/run/plugins/ZanLang-1.0.jar - ein beliebig altes
+    //      Jar. Ein Rueckfall, der gelingt und dabei das Falsche liefert, ist genau
+    //      die Form, die diesem Projekt heute drei Matches gekostet hat.
+    // Die Koordinate ist rename-fest: artifactId steht in ZanLang/build.gradle:85
+    // explizit auf 'zanlang' und haengt nicht an rootProject.name.
+    compileOnly "net.zanoria:zanlang:1.0"
     implementation 'redis.clients:jedis:5.1.3'
 }
 
