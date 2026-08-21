@@ -81,3 +81,34 @@ processResources {
         expand props
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+//  Befehlswaechter — eingebunden am 2026-08-21
+//
+//  Faengt Befehle, die deklariert oder implementiert sind und die niemand anmeldet. Wogegen er
+//  im Einzelnen steht und warum das Skript in zanoria-common liegt statt hier, steht in seinem
+//  Kopfkommentar: ../zanoria-common/gradle/befehlswaechter.gradle
+//
+//  ⚠️ Dieses Repo fuehrt eine plugin.yml, kein paper-plugin.yml. Damit greift hier vor allem
+//  Probe C: ein getCommand("x") auf einen Namen, der nicht unter commands: steht, gibt null
+//  zurueck - und das .setExecutor(...) darauf ist eine NullPointerException im onEnable, die
+//  das ganze Plugin deaktiviert.
+//
+//  ⚠️ Die if/throw-Kombination ist keine Umstaendlichkeit. Ein blosses
+//  `if (waechter.isFile()) apply from: waechter` verschwindet lautlos, sobald jemand die Datei
+//  umbenennt oder verschiebt - ein Waechter, der bei einem Tippfehler still aussetzt, ist kein
+//  Waechter. Fehlt dagegen der ganze Geschwister-Checkout, ist das etwas anderes und darf
+//  durchgehen: dann baut jemand bewusst ohne den Stack.
+//
+//  ⚠️ Er haengt an `check`, nicht an `build`, und braucht Python 3 auf dem Bauwirt. Fehlt der
+//  Interpreter, BRICHT der Task ab - er faellt ausdruecklich NICHT auf gruen zurueck.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+def waechter = file("${rootDir}/../zanoria-common/gradle/befehlswaechter.gradle")
+if (file("${rootDir}/../zanoria-common").isDirectory()) {
+    if (!waechter.isFile()) {
+        throw new GradleException(
+                "zanoria-common ist da, aber ${waechter} fehlt - der Befehlswaechter waere" +
+                " stillschweigend weg. Das ist genau die Bauart Fehler, gegen die er steht.")
+    }
+    apply from: waechter
+}
