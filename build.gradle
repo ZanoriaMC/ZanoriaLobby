@@ -94,6 +94,19 @@ processResources {
 //  zurueck - und das .setExecutor(...) darauf ist eine NullPointerException im onEnable, die
 //  das ganze Plugin deaktiviert.
 //
+//  ⚠️ SEINE REICHWEITE IST DAS DESKRIPTOR-MODUL, nicht "das Repo". Der Bau uebergibt zwar
+//  project.rootDir, aber das Skript benutzt den Pfad nur zum FINDEN der Deskriptoren; die
+//  gepruefte QUELLENMENGE sammelt `module_finden()` in
+//  ../zanoria-common/tools/befehlswaechter.py allein unter dem Verzeichnis, in dem die
+//  plugin.yml liegt. Hier faellt beides zusammen - der Deskriptor liegt in src/main/resources
+//  der Repowurzel. Gemessen am 2026-08-22: 5 Java-Dateien im Repo, und der Waechter meldet
+//  woertlich "geprueft 1 Plugin-Deskriptor(en), 5 Java-Datei(en)". Deckung vollstaendig.
+//  ⚠️ Das haelt nur, solange dieses Repo EIN Modul bleibt. Wer ein Nachbarmodul ohne eigenen
+//  Deskriptor anlegt, macht dessen Befehlscode fuer den Waechter unsichtbar, ohne dass etwas
+//  rot wird - in NexusStrike bleiben so 47 von 101 Dateien ungesehen. Der Beleg, beide
+//  Richtungen: dieselbe Klasse meldet im Deskriptor-Modul E_BEFEHL_NIE_ERZEUGT und im
+//  Nachbarmodul "keine Funde", Rueckgabe 0.
+//
 //  ⚠️ Die if/throw-Kombination ist keine Umstaendlichkeit. Ein blosses
 //  `if (waechter.isFile()) apply from: waechter` verschwindet lautlos, sobald jemand die Datei
 //  umbenennt oder verschiebt - ein Waechter, der bei einem Tippfehler still aussetzt, ist kein
