@@ -154,7 +154,7 @@ public final class ZanoriaLobby extends JavaPlugin implements Listener {
 
         var builderCmd = getCommand("builder");
         if (builderCmd != null) {
-            var bc = new BuilderCommand(builderService, builderRedis);
+            var bc = new BuilderCommand(builderService);
             builderCmd.setExecutor(bc);
             builderCmd.setTabCompleter(bc);
         }

@@ -15,6 +15,37 @@ import java.util.Set;
 public final class BuilderRedisClient {
 
     public static final String KEY_STATUS  = "builder:status";
+
+    /**
+     * Was der Builder-Server ueber sein WorldEdit/FAWE meldet.
+     *
+     * <p>⚠️ Der Name steht WORTGLEICH in {@code Builders/BuilderRedisClient.KEY_WORLDEDIT}.
+     * Weichen sie voneinander ab, schreibt der Builder-Server unter einen Schluessel, den hier
+     * niemand liest - und die Lobby weist ALLE ab, obwohl FAWE laeuft. Beide Seiten saehen fuer
+     * sich richtig aus.
+     */
+    public static final String KEY_WORLDEDIT = "builder:worldedit";
+
+    /**
+     * ⚠️ <b>STILLGELEGT am 2026-09-03. Diese Liste entscheidet NICHTS mehr.</b>
+     *
+     * <p>Bis dahin war sie das Tor zum Builder-Server: {@code BuilderServerService} fragte
+     * {@code isMember(spieler.getName())}. Ersetzt durch die Berechtigung
+     * {@code zanoria.builder}, vergeben von Nexus an OWNER, CO_OWNER und ADMIN.
+     *
+     * <p><b>Zwei Gruende, und beide gelten weiter:</b>
+     * <ol>
+     *   <li>Der Schluessel war der <b>Name</b>. Eine Namensaenderung verschob oder verlor den
+     *       Zugang - lautlos, ohne Ausnahme und ohne Logzeile.</li>
+     *   <li>Sie war ein <b>zweiter Ort</b> neben dem Rangsystem. Wer freischalten wollte, musste
+     *       zuerst wissen, dass es sie ueberhaupt gibt.</li>
+     * </ol>
+     *
+     * <p>⚠️ <b>NICHT geloescht</b>, aus zwei Gruenden: ein bestehender Redis-Bestand wuerde sonst
+     * verwaisen, und dieser Kommentar ginge mit. Wer sie zurueckverdrahtet, macht das Tor wieder
+     * namensabhaengig; {@code DasBuildertorIstEineBerechtigungTest} wird dabei rot, <b>und das
+     * ist Absicht</b>.
+     */
     public static final String KEY_MEMBERS = "builder:members";
     public static final String STATUS_STARTING = "starting";
     public static final String STATUS_RUNNING  = "running";
@@ -56,6 +87,8 @@ public final class BuilderRedisClient {
         return pool != null && !pool.isClosed();
     }
 
+    /** ⚠️ STILLGELEGT - entscheidet nichts mehr. Siehe {@link #KEY_MEMBERS}. */
+    @Deprecated
     public boolean isMember(String name) {
         if (!isAvailable()) return false;
         try (Jedis j = pool.getResource()) {
@@ -63,19 +96,31 @@ public final class BuilderRedisClient {
         }
     }
 
+    /** ⚠️ STILLGELEGT - siehe {@link #KEY_MEMBERS}. */
+    @Deprecated
     public void addMember(String name) {
         if (!isAvailable()) return;
         try (Jedis j = pool.getResource()) { j.sadd(KEY_MEMBERS, name.toLowerCase()); }
     }
 
+    /** ⚠️ STILLGELEGT - siehe {@link #KEY_MEMBERS}. */
+    @Deprecated
     public void removeMember(String name) {
         if (!isAvailable()) return;
         try (Jedis j = pool.getResource()) { j.srem(KEY_MEMBERS, name.toLowerCase()); }
     }
 
+    /** ⚠️ STILLGELEGT - siehe {@link #KEY_MEMBERS}. */
+    @Deprecated
     public Set<String> getMembers() {
         if (!isAvailable()) return Set.of();
         try (Jedis j = pool.getResource()) { return j.smembers(KEY_MEMBERS); }
+    }
+
+    /** Was der Builder-Server ueber sein WorldEdit/FAWE meldet, oder {@code null}. */
+    public String getWorldedit() {
+        if (!isAvailable()) return null;
+        try (Jedis j = pool.getResource()) { return j.get(KEY_WORLDEDIT); }
     }
 
     public String getStatus() {

@@ -41,8 +41,23 @@ public final class BuilderServerService {
     }
 
     public void joinBuilderServer(Player player) {
-        if (!redis.isMember(player.getName())) {
-            player.sendMessage(MM.deserialize(PREFIX + "<red>Du bist kein Builder."));
+        // ⚠️ Die BERECHTIGUNG hat der Befehl schon geprueft (plugin.yml: permission:
+        // zanoria.builder, vergeben von Nexus an OWNER/CO_OWNER/ADMIN). Hier steht die ZWEITE
+        // Bedingung, und sie ist eine andere Frage: hat der Zielserver ueberhaupt das Werkzeug,
+        // fuer das der Spieler hingeschickt wird?
+        //
+        // ⚠️ Hier stand bis zum 2026-09-03 eine Pruefung gegen redis.isMember(getName()) - eine
+        // Namensliste. Sie ist stillgelegt, nicht geloescht; der Grund steht ueber
+        // BuilderRedisClient.KEY_MEMBERS. Wer sie zurueckverdrahtet, macht das Tor wieder
+        // namensabhaengig, und DasBuildertorIstEineBerechtigungTest wird rot.
+        String worldedit = redis.getWorldedit();
+        if (worldedit == null || worldedit.isBlank() || "FEHLT".equals(worldedit)) {
+            // ⚠️ FAELLT ZU. Ein fehlender Schluessel ist KEIN Grund durchzulassen: der Spieler
+            // landete sonst auf einem Server ohne FAWE - also ohne den Grund seiner Reise -, und
+            // wuerde dort feststellen, dass kein einziger Befehl geht.
+            player.sendMessage(MM.deserialize(PREFIX + "<red>Der Builder-Server meldet kein"
+                    + " WorldEdit/FAWE (" + (worldedit == null ? "keine Meldung" : worldedit)
+                    + "). Der Zutritt bleibt zu, bis das behoben ist."));
             return;
         }
         if (pending.containsKey(player.getUniqueId())) {

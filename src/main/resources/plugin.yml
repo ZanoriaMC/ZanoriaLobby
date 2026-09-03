@@ -12,13 +12,20 @@ commands:
     permission: zanoria.lobby.npc
     permission-message: Du hast keine Berechtigung.
   builder:
-    description: Betritt den Builder-Server oder verwalte die Builder-Liste
-    usage: /builder [add|remove|list] [name]
+    description: Betritt den Builder-Server
+    usage: /builder
+    permission: zanoria.builder
+    permission-message: Du hast keine Berechtigung fuer den Builder-Server.
 
 permissions:
   zanoria.lobby.npc:
     description: Erlaubt das Verwalten von Lobby NPCs
     default: op
   zanoria.admin:
-    description: Erlaubt Builder-Verwaltung und andere Admin-Befehle
+    description: Erlaubt Admin-Befehle
+    default: op
+  # Vergeben von Nexus (RankPresentationService.darfBauen) an OWNER, CO_OWNER, ADMIN.
+  # Die Begruendung und ihre Ablaufbedingung stehen in NexusPermissions.BUILDER.
+  zanoria.builder:
+    description: Erlaubt den Zutritt zum Builder-Server (dort werden Welten angelegt und geloescht)
     default: op
