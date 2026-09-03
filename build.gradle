@@ -223,11 +223,18 @@ tasks.named('check') { dependsOn kistenwaechter }
 //  plugin.yml liegt. Hier faellt beides zusammen - der Deskriptor liegt in src/main/resources
 //  der Repowurzel. Gemessen am 2026-08-22: 5 Java-Dateien im Repo, und der Waechter meldet
 //  woertlich "geprueft 1 Plugin-Deskriptor(en), 5 Java-Datei(en)". Deckung vollstaendig.
-//  ⚠️ DIE ZAHL IST EINE MOMENTAUFNAHME UND WAECHST MIT JEDER DATEI. Am 2026-09-03 meldet er
-//  "6 Java-Datei(en)" - das Testgeruest ist dazugekommen. Wer hier eine feste Zahl liest und
-//  gegen den Bestand haelt, misst das Datum und nicht die Deckung. Die Aussage, die NICHT
-//  veraltet, ist die daneben: gemeldete Zahl == Zahl der .java unter der Wurzel. Genau die
-//  prueft der Waechter seit 2026-09-01 selbst und faellt sonst mit Rueckgabe 5.
+//  ⚠️ DIE ZAHL IST EINE MOMENTAUFNAHME UND WAECHST MIT JEDER DATEI - hier steht deshalb
+//  KEINE aktuelle mehr. Wer eine feste Zahl gegen den Bestand haelt, misst das Datum und
+//  nicht die Deckung.
+//
+//  ⚠️ Und das ist am Kommentar selbst vorgefuehrt worden: die erste Fassung dieses Absatzes
+//  nannte am 2026-09-03 "6 Java-Datei(en)" als Beispiel - und war noch am selben Tag ueberholt
+//  (23, nach Testgeruest, Schutz, Naht und Kistenumsetzung). Ein Absatz, der VOR veraltenden
+//  Zahlen warnt und dabei selbst eine fuehrt, ist die Warnung in Reinform.
+//
+//  Die Aussage, die NICHT veraltet: gemeldete Zahl == Zahl der .java unter der Wurzel. Genau
+//  die prueft der Waechter seit 2026-09-01 selbst und faellt sonst mit Rueckgabe 5. Wer den
+//  aktuellen Stand wissen will, faehrt `./gradlew check` und liest die Zeile.
 //
 //  ⚠️ src/test LIEGT IN DER GEPRUEFTEN MENGE. Ein Testfall, der ein getCommand("x")-Muster
 //  nachbaut, kann damit Probe C ausloesen, obwohl er nichts anmeldet. Heute kein Fehler,
