@@ -24,14 +24,19 @@ Stelle:
 | **1** Adventure/Blockschutz | 3, 4, 5, 6 | **fertig** |
 | **2** Naht (Stück 3) | 7, 8, 9, 10 | **fertig** |
 | **3** Hotbar (Stück 2) | 11, 12, 13, 13b, 14 | **fertig** |
-| **4** `/builder` (Stück 4) | 15, 16, 17 | offen |
+| **4** `/builder` (Stück 4) | 15, 16, 17 | **fertig** |
 | **5** Erstlauf | 18 | offen |
 | **6** TASKS.md | 19 | offen |
 
-**Letzte eigene Messung:** `XML=12 tests=45 skipped=0 failures=0 errors=0`, RC=0.
-Wächter: `BEFEHLSWAECHTER 33 Java-Datei(en) / keine Funde`,
+**Letzte eigene Messung (ZanoriaLobby):** `XML=13 tests=49 skipped=0 failures=0 errors=0`, RC=0.
+Wächter: `BEFEHLSWAECHTER 34 Java-Datei(en) / keine Funde`,
 `KISTENWAECHTER 22 Klasse(n) geprueft, 2 im Umsetzungspaket (Positivkontrolle bestanden)`,
 `PLATZHALTERWAECHTER 5 von 5`.
+
+**Fremde Repos:** Nexus `DasBaurechtHatEinenSchluesselTest tests=5 failures=0`
+(⚠️ der volle Lauf dort meldet **4 vorbestehende** Fehlschläge in zwei fremden Klassen — mit
+zurückgestellter Änderung identisch gemessen, einer davon `AccessDeniedException` auf
+`\\wsl.localhost`, weil WSL nicht läuft). Builders `XML=3 tests=8 failures=0`.
 
 ⚠️ **Das ist ein Meßprotokoll mit Datum, keine Zusage.** Es veraltet bei jedem Commit, der eine
 Testklasse hinzufügt. Wer die Zahl weitergibt, ohne den Befehl gefahren zu haben, gibt ein Datum

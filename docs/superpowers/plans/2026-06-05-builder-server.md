@@ -1,5 +1,26 @@
 # Builder Server Implementation Plan
 
+> ## ⚠️ TEILWEISE ÜBERHOLT — 2026-09-03
+>
+> **Das Zugangstor dieses Entwurfs gilt nicht mehr.** Wer hier `builder:members`,
+> `/builder add|remove|list` oder „whitelist" liest, liest den Stand bis zum 2026-09-02.
+>
+> | Damals | Seit 2026-09-03 (Commit `23a0bc7`) |
+> |---|---|
+> | Redis-Namensliste `builder:members` entscheidet | Berechtigung **`zanoria.builder`** entscheidet |
+> | `/builder add\|remove\|list` pflegen die Liste | **weg** — wer freischalten will, vergibt den Rang |
+> | kein `permission:`-Feld am Befehl | `permission: zanoria.builder` in `plugin.yml` |
+> | — | zusätzlich: Abweisung, wenn der Zielserver **kein FAWE meldet** |
+>
+> **Warum:** der Schlüssel war der **Spielername**. Eine Namensänderung verschob oder verlor den
+> Zugang, lautlos. Und die Liste war ein zweiter Ort neben dem Rangsystem.
+>
+> ⚠️ **Der Rest dieses Dokuments gilt weiter** — Pelican-Start auf Zuruf, `builder:status`,
+> Leerlauf-Abschaltung, der Velocity-Eintrag. Nur das Tor ist ein anderes.
+>
+> Der aktuelle Stand steht in `2026-09-03-lobby-spielbar-design.md`, Abschnitt 5.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Players on the builder whitelist can type `/builder` in the lobby to join a on-demand builder server; admins manage the whitelist via `/builder add/remove/list`; the builder server shuts down after 30min idle.
