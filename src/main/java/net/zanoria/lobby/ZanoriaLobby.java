@@ -39,6 +39,9 @@ import net.zanoria.lobby.builder.BuilderPelicanStarter;
 import net.zanoria.lobby.builder.BuilderRedisClient;
 import net.zanoria.lobby.builder.BuilderServerService;
 import net.zanoria.lobby.schutz.LobbyWeltschutz;
+import net.zanoria.lobby.hotbar.Hotbarhoerer;
+import net.zanoria.lobby.menue.chest.ChestKlickhoerer;
+import net.zanoria.lobby.menue.chest.ChestMenue;
 import net.zanoria.lobby.schutz.Lobbyschutz;
 
 import java.io.ByteArrayOutputStream;
@@ -95,6 +98,14 @@ public final class ZanoriaLobby extends JavaPlugin implements Listener {
                     getServer().getWorlds().stream().map(World::getName).toList());
         }
         getServer().getPluginManager().registerEvents(new LobbyWeltschutz(lobbyschutz), this);
+
+        // ── Menues und Hotbar ───────────────────────────────────────────────
+        // ⚠️ ChestMenue ist EXPERIMENTELL, und diese drei Zeilen sind die EINZIGE Stelle im
+        // Repo, die das weiss. Kommt ZanUI, wird hier getauscht - kein Hoerer wird angefasst.
+        // Dass das so bleibt, haelt :kistenwaechter maschinell fest.
+        ChestMenue chestMenue = new ChestMenue(getSLF4JLogger());
+        getServer().getPluginManager().registerEvents(new ChestKlickhoerer(chestMenue), this);
+        getServer().getPluginManager().registerEvents(new Hotbarhoerer(chestMenue), this);
 
         bossBarTask =getServer().getScheduler().runTaskTimer(this, this::updateBossBars, 20L, 20L);
 

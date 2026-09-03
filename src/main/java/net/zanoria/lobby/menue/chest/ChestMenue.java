@@ -72,13 +72,27 @@ public final class ChestMenue implements Menue {
             }
 
             spieler.openInventory(kiste);
-            offen.put(spieler.getUniqueId(), bildschirm);
+            merke(spieler.getUniqueId(), bildschirm);
             return true;
         } catch (RuntimeException | LinkageError fehler) {
             log.error("Bildschirm '{}' liess sich fuer {} nicht oeffnen.",
                     bildschirm.kennung(), spieler.getName(), fehler);
             return false;
         }
+    }
+
+    /**
+     * Merkt sich, welcher Bildschirm bei diesem Spieler offen ist.
+     *
+     * <p>⚠️ Paketsichtbar, und zwar <b>dieselbe</b> Methode, die {@link #oeffne} benutzt — kein
+     * Sondereingang fuer Tests. Der Grund, warum sie ueberhaupt herausgezogen ist:
+     * {@code oeffne} laesst sich ohne laufenden Server nicht fahren
+     * ({@code Bukkit.createInventory} und {@code new ItemStack} werfen beide, gemessen
+     * 2026-09-03). Ein Fall fuer {@code ChestKlickhoerer} muesste den Zustand sonst gar nicht
+     * herstellen koennen — und der Rumpf liefe in keinem Test.
+     */
+    void merke(UUID spieler, Bildschirm bildschirm) {
+        offen.put(spieler, bildschirm);
     }
 
     /** Der Bildschirm, den dieser Spieler offen hat — oder {@code null}. */
