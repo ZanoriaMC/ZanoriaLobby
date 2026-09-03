@@ -38,6 +38,8 @@ import net.zanoria.lobby.builder.BuilderCommand;
 import net.zanoria.lobby.builder.BuilderPelicanStarter;
 import net.zanoria.lobby.builder.BuilderRedisClient;
 import net.zanoria.lobby.builder.BuilderServerService;
+import net.zanoria.lobby.schutz.LobbyWeltschutz;
+import net.zanoria.lobby.schutz.Lobbyschutz;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
@@ -78,7 +80,23 @@ public final class ZanoriaLobby extends JavaPlugin implements Listener {
         removeSpawnedQueueNpcs();
         int npcsGesetzt = spawnQueueNpcs();
         getServer().getPluginManager().registerEvents(this, this);
-        bossBarTask = getServer().getScheduler().runTaskTimer(this, this::updateBossBars, 20L, 20L);
+
+        // ── Lobbyschutz ─────────────────────────────────────────────────────
+        Lobbyschutz lobbyschutz = Lobbyschutz.aus(
+                getConfig().getString("lobby.welt"),
+                getServer().getWorlds().stream().map(World::getName).toList());
+        if (lobbyschutz.faelltZu()) {
+            // ⚠️ LAUT. Ein stiller Rueckfall auf "alles geschuetzt" waere zwar sicher, aber
+            // niemand faende je den Tippfehler in der Konfiguration.
+            getSLF4JLogger().error(
+                    "ZanoriaLobby: die konfigurierte Lobbywelt '{}' existiert nicht."
+                            + " Vorhanden sind: {}. Es werden vorsorglich ALLE Welten geschuetzt.",
+                    getConfig().getString("lobby.welt"),
+                    getServer().getWorlds().stream().map(World::getName).toList());
+        }
+        getServer().getPluginManager().registerEvents(new LobbyWeltschutz(lobbyschutz), this);
+
+        bossBarTask =getServer().getScheduler().runTaskTimer(this, this::updateBossBars, 20L, 20L);
 
         LobbyNpcCommand npcCommand = new LobbyNpcCommand();
         var cmd = getCommand("lobbynpc");

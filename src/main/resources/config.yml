@@ -1,3 +1,10 @@
+# Die Welt, in der Adventure-Modus und Blockschutz gelten.
+# ⚠️ Steht hier ein Name, den es nicht gibt, wird ALLES geschuetzt und eine Fehlerzeile
+# geschrieben. Der Irrtum faellt absichtlich in diese Richtung: die Gegenrichtung waere
+# "niemand schuetzt etwas, und niemand erfaehrt es".
+lobby:
+  welt: world
+
 spawn:
   world: world
   x: 0.5
