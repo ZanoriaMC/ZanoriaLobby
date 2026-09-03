@@ -14,15 +14,27 @@
 
 ## ⚠️ Drei Regeln, die für JEDE Aufgabe gelten
 
-1. **`JAVA_HOME` vor jedem Gradle-Lauf auf JDK 21 setzen.** Sonst kippt der Daemon mit
-   *„stop command received"*. Gemessen: vier Läufe ohne fielen, zwei mit liefen.
+1. **`JAVA_HOME` vor jedem Gradle-Lauf auf JDK 21 setzen.**
    ```bash
    export JAVA_HOME="/c/Program Files/Java/jdk-21"
    ```
+   ⚠️ **KORREKTUR 2026-09-03: das ist hier nicht der wirksame Hebel.** `gradle.properties` dieses
+   Repos pinnt `org.gradle.java.home=C:/Program Files/Eclipse Adoptium/jdk-21.0.10+7`, und
+   **die Zeile wählt die Daemon-JVM** — die Stacktraces zeigen `java.base@21.0.10`, also das
+   Adoptium, nicht das exportierte. `JAVA_HOME` wählt nur die **Launcher**-JVM des `gradlew`-Skripts.
+   Beide sind hier 21, deshalb ist Setzen weiter richtig und schadet nie. **Aber wer den
+   Daemon-Absturz woanders jagt, sucht ihn in `gradle.properties`, nicht in der Umgebung.**
 2. **Die Ausgabe nie durch `grep`/`tail` messen.** Der Rückgabewert wäre dann der von `grep`.
    Immer in eine Datei schreiben, `$?` direkt danach lesen, und zur Kontrolle einmal `false` fahren.
 3. **Vor jedem Meßlauf `build/test-results` löschen.** Alte XML aus einem abgebrochenen Lauf liest
    sich wie ein frischer Befund.
+4. ⚠️ **`git diff` ist BLIND für neue Dateien — er taugt nicht als Beleg, daß eine Mutation
+   zurückgenommen wurde.** Am 2026-09-03 in Task 3 aufgefallen: die mutierte Datei war noch
+   unversioniert, `git diff --stat -- src/main` kam **leer** zurück und hätte „nichts mehr
+   geändert" gemeldet, ohne irgendetwas gemessen zu haben — dieselbe Bauart wie eine Prüfung über
+   eine leere Liste.
+   **Belege stattdessen am Inhalt:** vor dem Mutationslauf die Vorkommen zählen, nach dem
+   Zurücknehmen erneut zählen, und die Zeilen mit `rg` direkt aus der Datei zeigen.
 
 **Der Meßbefehl dieses Repos:**
 ```bash
