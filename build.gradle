@@ -116,6 +116,15 @@ tasks.named('test') {
 //  plugin.yml liegt. Hier faellt beides zusammen - der Deskriptor liegt in src/main/resources
 //  der Repowurzel. Gemessen am 2026-08-22: 5 Java-Dateien im Repo, und der Waechter meldet
 //  woertlich "geprueft 1 Plugin-Deskriptor(en), 5 Java-Datei(en)". Deckung vollstaendig.
+//  ⚠️ DIE ZAHL IST EINE MOMENTAUFNAHME UND WAECHST MIT JEDER DATEI. Am 2026-09-03 meldet er
+//  "6 Java-Datei(en)" - das Testgeruest ist dazugekommen. Wer hier eine feste Zahl liest und
+//  gegen den Bestand haelt, misst das Datum und nicht die Deckung. Die Aussage, die NICHT
+//  veraltet, ist die daneben: gemeldete Zahl == Zahl der .java unter der Wurzel. Genau die
+//  prueft der Waechter seit 2026-09-01 selbst und faellt sonst mit Rueckgabe 5.
+//
+//  ⚠️ src/test LIEGT IN DER GEPRUEFTEN MENGE. Ein Testfall, der ein getCommand("x")-Muster
+//  nachbaut, kann damit Probe C ausloesen, obwohl er nichts anmeldet. Heute kein Fehler,
+//  aber die Falle liegt scharf - beim ersten Befehlstest hier nachsehen.
 //  ⚠️ Das haelt nur, solange dieses Repo EIN Modul bleibt. Wer ein Nachbarmodul ohne eigenen
 //  Deskriptor anlegt, macht dessen Befehlscode fuer den Waechter unsichtbar, ohne dass etwas
 //  rot wird - in NexusStrike bleiben so 47 von 101 Dateien ungesehen. Der Beleg, beide
