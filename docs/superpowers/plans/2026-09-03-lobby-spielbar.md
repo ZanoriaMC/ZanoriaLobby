@@ -625,7 +625,22 @@ git commit -m "Hoerertreiber: Attrappe und Mitschrift"
 - Create: `src/main/java/net/zanoria/lobby/schutz/LobbyWeltschutz.java`
 - Test: `src/test/java/net/zanoria/lobby/schutz/DerWeltschutzGreiftWirklichTest.java`
 
-- [ ] **Step 1a: ⚠️ ZUERST messen, ob `BlockBreakEvent` ohne Server baubar ist**
+- [x] **Step 1a: ⚠️ GEMESSEN am 2026-09-03 (Task 2) — `BlockBreakEvent` IST baubar**
+
+Die Rückfalloption unten **greift nicht**. Gemessen wurde je Glied einzeln:
+
+```
+REGISTRYGRENZE: BAUBAR   new BlockBreakEvent(block, spieler)
+REGISTRYGRENZE: BAUBAR   new BlockPlaceEvent(block, zustand, dagegen, null, spieler, true)
+REGISTRYGRENZE: BAUBAR   new PlayerJoinEvent(spieler, Component.text("x"))
+```
+
+⚠️ **Beim `BlockPlaceEvent` die SIEBENSTELLIGE Fassung mit explizitem `EquipmentSlot` nehmen** —
+die sechsstellige ist `forRemoval`-markiert.
+
+<details><summary>Die ursprüngliche Anweisung, falls die Messung je zurückgenommen wird</summary>
+
+**⚠️ ZUERST messen, ob `BlockBreakEvent` ohne Server baubar ist**
 
 Task 2 hat die Grenze für `ItemStack` gemessen; für `BlockBreakEvent` ist sie **nicht** gemessen,
 und sie ist an der Signatur nicht ablesbar. Ergänze in `DieRegistrygrenzeIstGemessenTest.miss()`:
@@ -647,6 +662,8 @@ Fahren, `<system-out>` lesen.
 ⚠️ **Meldet die Zeile `NICHT`, wird nicht getrickst:** die Wirkungsprüfung wandert dann vollständig
 in den Erstlauf (Task 18), und die Fälle unten werden **gestrichen statt entkernt**. Ein Fall, der
 das Argument selbst baut, um die Grenze zu umgehen, mißt die Engine statt des Aufrufers.
+
+</details>
 
 - [ ] **Step 1b: Den Wirkungsfall schreiben**
 
@@ -1288,10 +1305,25 @@ gefahren und rot, zurueckgenommen gruen."
 ⚠️ **Diese Klasse ist der einzige Ort im Repo, der einen Kisten-Typ berühren darf.** Das hält
 Task 10 maschinell fest.
 
-⚠️ **Ihre Wirkung ist ohne Server NICHT prüfbar** (`Bukkit.createInventory`, `new ItemStack` —
-Registry-Grenze, Task 2). Geprüft wird hier die **Auswahl** des Materials; das Öffnen selbst
-beantwortet der Erstlauf (Task 18). Wer dafür einen Einheitstest baut, der das Inventar selbst
-stellt, mißt die Attrappe statt der Klasse.
+⚠️ **Ihre Wirkung ist ohne Server NICHT prüfbar** — und die Messung aus Task 2 nennt dafür **zwei
+verschiedene Gründe**, die man nicht zusammenwerfen darf:
+
+```
+REGISTRYGRENZE: NICHT   new ItemStack(Material.COMPASS)
+                        -> ExceptionInInitializerError <- IllegalStateException:
+                           No RegistryAccess implementation found
+REGISTRYGRENZE: NICHT   Bukkit.createInventory(null, 9, "titel")
+                        -> NullPointerException: "org.bukkit.Bukkit.server" is null
+```
+
+Das zweite ist die **Server-Singleton**-Grenze und ließe sich grundsätzlich stellen (ein
+`Bukkit.server`-Platzhalter per Feld). Das erste ist die **echte Registry-Grenze** und läßt sich
+nicht stellen. **Weil `ItemStack` hart blockiert, bleibt das Öffnen trotzdem im Erstlauf** — aber
+wer die beiden verwechselt, sucht später am falschen Ende.
+
+Geprüft wird hier die **Auswahl** des Materials; das Öffnen selbst beantwortet der Erstlauf
+(Task 18). Wer dafür einen Einheitstest baut, der das Inventar selbst stellt, mißt die Attrappe
+statt der Klasse.
 
 **Files:**
 - Create: `src/main/java/net/zanoria/lobby/menue/chest/Materialwahl.java`
@@ -2374,22 +2406,29 @@ Umsetzungspaket gefunden hat (jetzt mehr als vorher).
 |---|---|---|
 | **M10** | `Hotbarhoerer.beiPlatz`: `return false;` am Kopf | `jederPlatzOeffnetSeinen` |
 | **M11** | `Lobbybildschirme.fuer`: `RUCKSACK` gibt `Bildschirm.of(..., List.of())` | `jedesItemOeffnetEtwas` |
-| **M12** | `ChestKlickhoerer.beimKlicken`: `setCancelled(true)` entfernt | ⚠️ **erwartet STILL GRÜN** — siehe Step 9 |
+| **M12** | `ChestKlickhoerer.beimKlicken`: `setCancelled(true)` entfernt | `derKlickWirdAbgebrochen` — **muß rot werden**, siehe Step 9 |
 
-- [ ] **Step 9: M12 ist ein Befund, kein Versehen**
+- [x] **Step 9: ⚠️ KORRIGIERT am 2026-09-03 — M12 ist KEINE bekannte Grenze mehr**
 
-`ChestKlickhoerer` läuft in keinem Einheitstest: `InventoryClickEvent` verlangt eine
-`InventoryView`, und deren Baubarkeit ohne Server ist **nicht gemessen**. Zwei Wege, in dieser
-Reihenfolge:
+Hier stand, `ChestKlickhoerer` laufe in keinem Einheitstest und M12 bleibe still grün. **Die
+Messung aus Task 2 sagt etwas anderes:**
 
-1. Ergänze in `DieRegistrygrenzeIstGemessenTest` eine Zeile für `InventoryClickEvent`. **Ist er
-   baubar**, schreibe den Wirkungsfall und fahre M12 erneut — sie muß rot werden.
-2. **Ist er nicht baubar**, gehört M12 in den Erstlauf (Task 18) und wird **dort** als Punkt
-   geführt. Der Befund wird im Klassenkommentar von `ChestKlickhoerer` vermerkt: *„dieser Rumpf
-   läuft in keinem Einheitstest; die Deckung liegt im Erstlauf"*.
+```
+REGISTRYGRENZE: BAUBAR   new InventoryClickEvent(sicht, CONTAINER, 0, LEFT, PICKUP_ALL)
+                         | mitschrift=[sicht#convertSlot]
+```
 
-⚠️ **Nicht die Mutation streichen.** Ein ungedeckter Rumpf, der gemeldet ist, ist etwas anderes als
-einer, den niemand bemerkt hat.
+`InventoryView` ist über eine Attrappe stellbar, und die Mitschrift belegt, daß sie wirklich
+gefragt wurde. **Also wird der Rumpf gefahren, nicht gemeldet.** Schreibe
+`DerKlickImMenueWirdAbgebrochenTest` mit einer `InventoryView`-Attrappe und fahre M12 — sie **muß
+rot werden**.
+
+⚠️ **Das ist der Unterschied zwischen einer gemessenen Grenze und einer angenommenen.** Angenommen
+hätte diese Lücke drei Monate überlebt, und der Klick im Menü hätte Items mitnehmen lassen — in
+einer Adventure-Lobby der einzige Weg, doch noch etwas kaputtzumachen.
+
+⚠️ **Bleibt M12 trotz des neuen Falls still grün, ist das ein echter Befund** — dann fährt der Fall
+den Rumpf nicht wirklich. Nachsehen, nicht weitergehen.
 
 - [ ] **Step 10: Anmelden in `ZanoriaLobby.onEnable`**
 
