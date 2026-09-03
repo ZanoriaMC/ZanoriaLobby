@@ -98,6 +98,113 @@ tasks.named('test') {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════
+//  KISTENWAECHTER — eingebunden am 2026-09-03
+//
+//  Er haelt die TRAGENDE AUFLAGE des Auftrags: die Menues muessen spaeter gegen ZanUI
+//  austauschbar sein, OHNE die Hoerer anzufassen. Corwis woertlich: "Sonst ist 'experimentell'
+//  nur ein Wort, und in drei Monaten steht es noch da."
+//
+//  ⚠️ WARUM DAS OHNE WAECHTER NICHT HAELT. ZanUI kennt keine Slots - es fuehrt die
+//  Paper-Dialog-API (UiScreen = Kennung + Titel + Knoepfe), am 2026-09-03 an
+//  ZanUI/core/.../UiScreen.java gemessen. Ein Inventory-Typ in einem Hoerer uebersetzt
+//  einwandfrei, macht NICHTS rot - und macht den Tausch trotzdem unmoeglich. Genau die Sorte
+//  Bruch, die kein Test findet, weil niemand nach ihr fragt.
+//
+//  ⚠️ ItemStack steht ABSICHTLICH NICHT auf der Liste, und das ist eine Entscheidung, keine
+//  Luecke. Die Auflage betrifft MENUES, nicht Gegenstaende: die Hotbar-Items bleiben auch nach
+//  dem Tausch ItemStacks - ZanUI ersetzt die Menues, nicht das Inventar des Spielers. Ein Verbot
+//  von ItemStack wuerde Stueck 2 unbaubar machen und haette mit der Austauschbarkeit nichts zu
+//  tun.
+//
+//  ⚠️ ER LIEST DEN BYTECODE, NICHT DEN QUELLTEXT. Eine Quelltextsuche hat in diesem Stack schon
+//  einmal einen Kommentar fuer eine Anmeldung gehalten. Im Konstantenpool steht der Typ so oder
+//  so - ob er aus einem Import, einer Signatur oder einem Aufruf kommt.
+//
+//  ⚠️ ER MACHT DEN BAU ROT, anders als der Platzhalterwaechter daneben. Begruendung: ein
+//  Kisten-Typ im Hoerer ist kein zu erledigender Rest, sondern der Bruch selbst. Und er waere
+//  nicht DAUERHAFT rot, sondern nur bei einem echten Verstoss - die Ermuedungsgefahr eines immer
+//  roten Baus (in ZanoriaCommands beobachtet) besteht hier also nicht.
+//
+//  ⚠️ ER PRUEFT ZUERST SEINE EIGENE SUCHE. Findet er im Umsetzungspaket KEINEN Kisten-Typ,
+//  bricht er ab statt "keine Funde ausserhalb" zu melden. Ohne das waere er gratis gruen, sobald
+//  jemand das Paket umbenennt oder die Typnamen sich aendern - ein Sucher, der nichts sieht,
+//  meldet sonst ein geloestes Problem.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+def kistenwaechter = tasks.register('kistenwaechter') {
+    dependsOn tasks.named('classes')
+    def klassenVerzeichnis = layout.buildDirectory.dir('classes/java/main')
+    inputs.dir(klassenVerzeichnis)
+    outputs.upToDateWhen { false }
+
+    doLast {
+        def verboten = [
+                'org/bukkit/inventory/Inventory',
+                'org/bukkit/inventory/InventoryView',
+                'org/bukkit/event/inventory/InventoryClickEvent',
+                'org/bukkit/event/inventory/InventoryCloseEvent',
+                'org/bukkit/event/inventory/InventoryDragEvent',
+        ]
+        def erlaubtesPaket = 'net/zanoria/lobby/menue/chest/'
+
+        def wurzel = klassenVerzeichnis.get().asFile
+        def klassen = []
+        if (wurzel.isDirectory()) {
+            wurzel.eachFileRecurse { if (it.name.endsWith('.class')) klassen << it }
+        }
+        if (klassen.isEmpty()) {
+            throw new GradleException(
+                    "KISTENWAECHTER: keine uebersetzten Klassen unter ${wurzel} - dann ist" +
+                    " 'kein Kisten-Typ gefunden' kein Befund, sondern ein leerer Sucher.")
+        }
+
+        def treffer = [:]
+        def imPaket = [:]
+        klassen.each { datei ->
+            def pfad = wurzel.toPath().relativize(datei.toPath()).toString().replace('\\', '/')
+            // ⚠️ ISO-8859-1: die Klassendatei wird als BYTES gelesen, nicht als Text. Jedes Byte
+            // bildet auf genau ein Zeichen ab, damit die Typnamen im Konstantenpool auffindbar
+            // bleiben. UTF-8 wuerde Bytefolgen zusammenfassen und Treffer verschlucken.
+            def text = new String(datei.getBytes(), 'ISO-8859-1')
+            def gefunden = verboten.findAll { text.contains(it) }
+            if (gefunden.isEmpty()) {
+                return
+            }
+            if (pfad.startsWith(erlaubtesPaket)) {
+                imPaket[pfad] = gefunden
+            } else {
+                treffer[pfad] = gefunden
+            }
+        }
+
+        if (imPaket.isEmpty()) {
+            throw new GradleException(
+                    "KISTENWAECHTER: im Umsetzungspaket '${erlaubtesPaket}' steht KEIN einziger" +
+                    " Kisten-Typ. Entweder ist die Umsetzung weg, oder diese Suche findet nichts" +
+                    " mehr (Paket umbenannt? Typnamen geaendert?). In beiden Faellen ist die" +
+                    " Meldung 'keine Funde ausserhalb' wertlos - deshalb bricht sie hier ab" +
+                    " statt gruen zu melden.")
+        }
+
+        logger.lifecycle("KISTENWAECHTER: ${klassen.size()} Klasse(n) geprueft," +
+                " ${imPaket.size()} im Umsetzungspaket (Positivkontrolle bestanden).")
+
+        if (!treffer.isEmpty()) {
+            treffer.each { pfad, typen ->
+                logger.error("KISTENWAECHTER:   ${pfad} -> ${typen.join(', ')}")
+            }
+            throw new GradleException(
+                    "KISTENWAECHTER: ${treffer.size()} Klasse(n) ausserhalb von" +
+                    " '${erlaubtesPaket}' fassen einen Kisten-Typ an.\n" +
+                    "SCHADEN: die Menues sind dann NICHT mehr gegen ZanUI austauschbar, ohne" +
+                    " diese Klassen anzufassen. ZanUI kennt keine Slots - es fuehrt die" +
+                    " Paper-Dialog-API (Kennung + Titel + Knoepfe). Wer ein Menue braucht, ruft" +
+                    " Menue.oeffne(spieler, bildschirm) und nichts anderes.")
+        }
+    }
+}
+tasks.named('check') { dependsOn kistenwaechter }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 //  Befehlswaechter — eingebunden am 2026-08-21
 //
 //  Faengt Befehle, die deklariert oder implementiert sind und die niemand anmeldet. Wogegen er
