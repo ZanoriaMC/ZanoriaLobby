@@ -205,6 +205,66 @@ def kistenwaechter = tasks.register('kistenwaechter') {
 tasks.named('check') { dependsOn kistenwaechter }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════
+//  PLATZHALTERWAECHTER — eingebunden am 2026-09-03
+//
+//  Er meldet bei jedem Bau, welche Hotbar-Eintraege noch auf Platzhalter zeigen - also fuer
+//  welche die Textur fehlt.
+//
+//  ⚠️ ER MACHT DEN BAU NICHT ROT, und das ist der Unterschied zum Kistenwaechter darueber.
+//  Er waere ab heute DAUERHAFT rot (alle fuenf sind Platzhalter), und ein dauerhaft roter Bau
+//  wird nach zwei Tagen ignoriert - in ZanoriaCommands beobachtet. Er MELDET laut; die MENGE
+//  ist in DieHotbarNenntIhrePlatzhalterTest gepinnt, und dort wird es rot, wenn einer lautlos
+//  dazukommt ODER lautlos verschwindet. Laut melden und scharf pinnen sind zwei Aufgaben, und
+//  sie liegen absichtlich an zwei Orten.
+//
+//  ⚠️ ER LIEST DAS UEBERSETZTE ENUM, nicht den Quelltext - er fragt istPlatzhalter() am
+//  geladenen Wert. Eine Quelltextsuche haette in diesem Stack schon einmal einen Kommentar fuer
+//  eine Anmeldung gehalten.
+//
+//  ⚠️ ER BRICHT AB, WENN DAS ENUM LEER IST. Ein leerer Sucher meldete sonst "0 von 0, keine
+//  Platzhalter" - und das saehe aus wie ein geloestes Problem statt wie eine kaputte Messung.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+def platzhalterwaechter = tasks.register('platzhalterwaechter') {
+    dependsOn tasks.named('classes')
+    def klassenVerzeichnis = layout.buildDirectory.dir('classes/java/main')
+    def pfade = configurations.compileClasspath
+    inputs.dir(klassenVerzeichnis)
+    outputs.upToDateWhen { false }
+
+    doLast {
+        def urls = ([klassenVerzeichnis.get().asFile] + pfade.files)
+                .collect { it.toURI().toURL() } as URL[]
+        def lader = new URLClassLoader(urls, (ClassLoader) null)
+        def enumKlasse = lader.loadClass('net.zanoria.lobby.hotbar.Hotbarplatz')
+        def alle = enumKlasse.getEnumConstants()
+
+        if (alle.length == 0) {
+            throw new GradleException(
+                    "PLATZHALTERWAECHTER: Hotbarplatz hat KEINE Eintraege - 'kein Platzhalter'" +
+                    " waere dann kein Befund, sondern ein leerer Sucher.")
+        }
+
+        def offen = alle.findAll { it.istPlatzhalter() }
+        logger.lifecycle("PLATZHALTERWAECHTER: ${offen.size()} von ${alle.length}" +
+                " Hotbar-Eintraegen zeigen noch auf Platzhalter.")
+        if (offen.isEmpty()) {
+            logger.lifecycle("PLATZHALTERWAECHTER: jede Textur ist geliefert.")
+        } else {
+            offen.each {
+                logger.lifecycle("PLATZHALTERWAECHTER:   ${it.name()} (Platz ${it.platz()})" +
+                        " -> ${it.sinnbild().nexoKennung()}" +
+                        " (Rueckfall: ${it.sinnbild().vanillaRueckfall()})")
+            }
+            logger.lifecycle("PLATZHALTERWAECHTER: solange hier Zeilen stehen, sieht die Hotbar" +
+                    " im Spiel nach Vanilla aus. Wer eine Textur liefert, setzt istPlatzhalter()" +
+                    " auf false UND traegt den Eintrag in" +
+                    " DieHotbarNenntIhrePlatzhalterTest aus - beides zusammen.")
+        }
+    }
+}
+tasks.named('check') { dependsOn platzhalterwaechter }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 //  Befehlswaechter — eingebunden am 2026-08-21
 //
 //  Faengt Befehle, die deklariert oder implementiert sind und die niemand anmeldet. Wogegen er
