@@ -12,6 +12,43 @@
 
 ---
 
+## Stand — gemessen am 2026-09-03
+
+⚠️ **Die Checkboxen unten sind NICHT gepflegt.** Sie stehen alle noch auf offen, und das war nach
+vierzehn erledigten Aufgaben selbst eine falsche Behauptung. Der Stand steht hier, an genau einer
+Stelle:
+
+| Phase | Aufgaben | Stand |
+|---|---|---|
+| **0** Testgerüst | 1, 2 | **fertig** |
+| **1** Adventure/Blockschutz | 3, 4, 5, 6 | **fertig** |
+| **2** Naht (Stück 3) | 7, 8, 9, 10 | **fertig** |
+| **3** Hotbar (Stück 2) | 11, 12, 13, 13b, 14 | **fertig** |
+| **4** `/builder` (Stück 4) | 15, 16, 17 | offen |
+| **5** Erstlauf | 18 | offen |
+| **6** TASKS.md | 19 | offen |
+
+**Letzte eigene Messung:** `XML=12 tests=45 skipped=0 failures=0 errors=0`, RC=0.
+Wächter: `BEFEHLSWAECHTER 33 Java-Datei(en) / keine Funde`,
+`KISTENWAECHTER 22 Klasse(n) geprueft, 2 im Umsetzungspaket (Positivkontrolle bestanden)`,
+`PLATZHALTERWAECHTER 5 von 5`.
+
+⚠️ **Das ist ein Meßprotokoll mit Datum, keine Zusage.** Es veraltet bei jedem Commit, der eine
+Testklasse hinzufügt. Wer die Zahl weitergibt, ohne den Befehl gefahren zu haben, gibt ein Datum
+weiter.
+
+### Mutationen, die absichtlich STILL GRÜN bleiben
+
+| | Warum, und wer sie stattdessen fängt |
+|---|---|
+| **M5** Anmeldezeile von `LobbyWeltschutz` entfernt | Kein Einheitstest sieht eine Anmeldung. **Der Erstlauf (Task 18).** ⚠️ Nicht mit einem Quelltext-Test schließen — der prüfte die Anmeldung der Frage und bemerkte einen Aufruf hinter einer nie wahren Bedingung nicht. |
+| **M18** FAWE-Prüfung durchgelassen | Braucht Redis und einen laufenden Server. **Der Erstlauf (Task 18).** |
+
+⚠️ **M3 und M12 standen hier ebenfalls und stehen es NICHT mehr** — beide sind gemessen und
+geschlossen. M12 war eine *angenommene* Grenze, die die Messung in Task 2 widerlegt hat.
+
+---
+
 ## ⚠️ Drei Regeln, die für JEDE Aufgabe gelten
 
 1. **`JAVA_HOME` vor jedem Gradle-Lauf auf JDK 21 setzen.**
