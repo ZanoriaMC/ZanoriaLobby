@@ -3311,9 +3311,37 @@ WorldEdit/FAWE meldet."
 `compileJava` ausgeführt, 411 bzw. 22 Klassen aus gelöschtem Klassenverzeichnis, Rückgabewert 0.
 **Der Erstlauf ist damit Teil dieser Arbeit.**
 
-⚠️ **Er beantwortet, was kein Einheitstest beantwortet.** Nach der Arbeit stehen mindestens drei
-Mutationen offen, die nur er fangen kann: **M12** (Klick im Menü), **M18** (FAWE-Prüfung), und die
-gesamte Item-Vergabe aus Task 14.
+⚠️ **Er beantwortet, was kein Einheitstest beantwortet.** Nach der Arbeit stehen zwei Mutationen
+offen, die nur er fangen kann: **M5** (Anmeldezeile entfernt) und **M18** (FAWE-Prüfung), dazu die
+gesamte Item-Vergabe aus Task 14. *(M12 stand hier und ist geschlossen — siehe Task 13 Step 9.)*
+
+### ⚠️ VORBEDINGUNGEN — ohne sie misst der Erstlauf den falschen Stand
+
+**Diese Schritte kommen VOR dem ersten Lauf, nicht danach.** Sie sind alle von derselben Form —
+*gebaut ≠ ausgeliefert* —, und diese Form hat am 2026-09-03 mehrfach zugeschlagen.
+
+1. **ZanLang neu bauen UND nach mavenLocal veröffentlichen.**
+   Die 14 neuen Menü-Schlüssel liegen in ZanLangs **Quelle**
+   (`translations/de_de.json`, `en_us.json`, Commit `77e69b1`).
+   `JederSchluesselHatEinenSatzTest` liest genau diese Quelle — die Lobby zur **Laufzeit** aber das
+   **Jar aus mavenLocal**, und das stammte am 2026-09-03 vom **15. August**.
+   ⚠️ **Ohne diesen Schritt stehen die Menütitel im Spiel roh da, während der Bau grün meldet.**
+   Der Wächter kann das nicht fangen: er misst die Quelle, das Spiel liest das Jar.
+
+2. **Nexus neu bauen** (Task 15 ändert `NexusPermissions` und `RankPresentationService`).
+   ZanoriaLobby übersetzt gegen `Nexus/build/libs/Nexus-1.0-SNAPSHOT.jar`; ohne Neubau kennt es
+   `NexusPermissions.BUILDER` nicht.
+
+3. **ZanoriaLobby-Jar neu bauen** und prüfen, dass der **eigene Stand wirklich drin ist** — an
+   einer **Klasse**, nicht am Datum. Etwa:
+   ```bash
+   unzip -l build/libs/ZanoriaLobby-1.0-SNAPSHOT.jar | grep -c "menue/chest/ChestKlickhoerer"
+   ```
+   ⚠️ Und eine **Positivkontrolle mit einer Nachbarklasse**, die es sicher gibt — sonst belegt ein
+   Nullbefund nur, dass die Suche nicht trifft.
+
+⚠️ **Wer eine dieser drei überspringt, misst einen alten Stand und meldet grün.** Der Erstlauf
+sagt dann nichts über die Arbeit, die er prüfen soll.
 
 **Files:**
 - Create: `tools/erstlauf.sh`
