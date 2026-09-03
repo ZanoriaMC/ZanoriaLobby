@@ -39,6 +39,7 @@ import net.zanoria.lobby.builder.BuilderPelicanStarter;
 import net.zanoria.lobby.builder.BuilderRedisClient;
 import net.zanoria.lobby.builder.BuilderServerService;
 import net.zanoria.lobby.schutz.LobbyWeltschutz;
+import net.zanoria.lobby.hotbar.Hotbarausgabe;
 import net.zanoria.lobby.hotbar.Hotbarhoerer;
 import net.zanoria.lobby.menue.chest.ChestKlickhoerer;
 import net.zanoria.lobby.menue.chest.ChestMenue;
@@ -106,6 +107,7 @@ public final class ZanoriaLobby extends JavaPlugin implements Listener {
         ChestMenue chestMenue = new ChestMenue(getSLF4JLogger());
         getServer().getPluginManager().registerEvents(new ChestKlickhoerer(chestMenue), this);
         getServer().getPluginManager().registerEvents(new Hotbarhoerer(chestMenue), this);
+        getServer().getPluginManager().registerEvents(new Hotbarausgabe(getSLF4JLogger()), this);
 
         bossBarTask =getServer().getScheduler().runTaskTimer(this, this::updateBossBars, 20L, 20L);
 
