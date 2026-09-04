@@ -73,16 +73,40 @@ public final class ZanoriaLobby extends JavaPlugin implements Listener {
     public void onEnable() {
         saveDefaultConfig();
         getServer().getMessenger().registerOutgoingPluginChannel(this, QUEUE_CHANNEL);
+        // ⚠️ HIER STAND BIS ZUM 2026-09-03 EIN disablePlugin(this). Der Erstlauf hat gezeigt,
+        // was das kostet, und der Befund ist groesser als eine Verdrahtungsfrage:
+        //
+        //   Nexus braucht MySQL (127.0.0.1:3308). Faellt die Datenbank aus, schaltet Nexus sich
+        //   ab; ZanoriaLobby fand dann keinen QueueService und schaltete sich EBENFALLS ab -
+        //   mitsamt LOBBYSCHUTZ, Hotbar und Menues. In einer Lobby im Ueberlebensmodus heisst
+        //   das: kein Blockschutz, weil eine DATENBANK weg ist.
+        //
+        // Gemessen am 2026-09-03, woertlich aus dem Erstlaufprotokoll:
+        //   [Nexus] Database connection failed: Access denied for user 'root'@'172.19.0.1'
+        //   [Nexus] Nexus failed to start - disabling.
+        //   [ZanoriaLobby] NoClassDefFoundError: net/zanoria/nexus/NexusPlugin
+        //                  at resolveQueueService(ZanoriaLobby.java:205)
+        //
+        // ⚠️ Der Schutz haengt jetzt an NICHTS ausser der Konfiguration. Ohne Nexus faellt
+        // allein die WARTESCHLANGE aus - laut gemeldet, nicht stillschweigend -, und der Rest
+        // der Lobby bleibt bedienbar. Ein Ausfall soll so klein sein wie seine Ursache.
         queueService = resolveQueueService();
-        if (queueService == null) {
-            getSLF4JLogger().error("Nexus QueueService unavailable - disabling ZanoriaLobby.");
-            getServer().getPluginManager().disablePlugin(this);
-            return;
+        boolean warteschlangeLaeuft = queueService != null;
+        if (!warteschlangeLaeuft) {
+            getSLF4JLogger().error(
+                    "ZanoriaLobby: Nexus QueueService nicht erreichbar. Die WARTESCHLANGE faellt"
+                            + " aus - keine Queue-NPCs, keine BossBar, kein /lobbynpc."
+                            + " Lobbyschutz, Hotbar und Menues laufen weiter."
+                            + " Haeufigste Ursache: Nexus kommt nicht hoch, weil seine Datenbank"
+                            + " fehlt - dann steht der Grund in den Nexus-Zeilen darueber.");
         }
 
-        loadNpcDefinitions();
-        removeSpawnedQueueNpcs();
-        int npcsGesetzt = spawnQueueNpcs();
+        int npcsGesetzt = 0;
+        if (warteschlangeLaeuft) {
+            loadNpcDefinitions();
+            removeSpawnedQueueNpcs();
+            npcsGesetzt = spawnQueueNpcs();
+        }
         getServer().getPluginManager().registerEvents(this, this);
 
         // ── Lobbyschutz ─────────────────────────────────────────────────────
@@ -109,18 +133,20 @@ public final class ZanoriaLobby extends JavaPlugin implements Listener {
         getServer().getPluginManager().registerEvents(new Hotbarhoerer(chestMenue), this);
         getServer().getPluginManager().registerEvents(new Hotbarausgabe(getSLF4JLogger()), this);
 
-        bossBarTask =getServer().getScheduler().runTaskTimer(this, this::updateBossBars, 20L, 20L);
+        if (warteschlangeLaeuft) {
+            bossBarTask = getServer().getScheduler().runTaskTimer(this, this::updateBossBars, 20L, 20L);
 
-        LobbyNpcCommand npcCommand = new LobbyNpcCommand();
-        var cmd = getCommand("lobbynpc");
-        if (cmd != null) {
-            cmd.setExecutor(npcCommand);
-            cmd.setTabCompleter(npcCommand);
+            LobbyNpcCommand npcCommand = new LobbyNpcCommand();
+            var cmd = getCommand("lobbynpc");
+            if (cmd != null) {
+                cmd.setExecutor(npcCommand);
+                cmd.setTabCompleter(npcCommand);
+            }
         }
 
         // ⚠️ GESETZT, nicht npcs.size(). Die alte Fassung meldete die Konfigurationseintraege
         // und stand am 2026-08-13 auf "7", waehrend im Spiel kein einziger NPC existierte.
-        if (npcsGesetzt < npcs.size()) {
+        if (warteschlangeLaeuft && npcsGesetzt < npcs.size()) {
             getSLF4JLogger().error(
                     "ZanoriaLobby: nur {} von {} Queue-NPCs gesetzt - die uebrigen fehlen im Spiel."
                             + " Ursache steht in den Zeilen darueber.",
@@ -180,6 +206,9 @@ public final class ZanoriaLobby extends JavaPlugin implements Listener {
         }
 
         event.setCancelled(true);
+        if (queueService == null) {
+            return;
+        }
         QueueNpcDefinition npc = findNpc(entity);
         if (npc == null) {
             return;
@@ -190,6 +219,11 @@ public final class ZanoriaLobby extends JavaPlugin implements Listener {
 
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
+        // ⚠️ Ohne Nexus gibt es keine Warteschlange - und dann auch keine BossBar. Ein
+        // ungeschuetzter Zugriff waere hier eine NullPointerException bei JEDEM Beitritt.
+        if (queueService == null) {
+            return;
+        }
         if (queueService.isQueued(event.getPlayer().getUniqueId())) {
             showQueueBar(event.getPlayer());
         }
@@ -200,12 +234,32 @@ public final class ZanoriaLobby extends JavaPlugin implements Listener {
         hideQueueBar(event.getPlayer());
     }
 
+    /**
+     * Der QueueService von Nexus, oder {@code null}.
+     *
+     * <p>⚠️ <b>Faengt {@code LinkageError} mit, und das ist gemessen, keine Vorsicht.</b> Ist
+     * Nexus abgeschaltet, weil seine Datenbank fehlt, laedt schon das {@code instanceof
+     * NexusPlugin} die Klasse - und das wirft {@code NoClassDefFoundError}, einen
+     * {@code Error}. Ein {@code catch (Exception)} liesse ihn durch.
+     *
+     * <p>Gemessen am 2026-09-03 im Erstlauf, woertlich:
+     * {@code NoClassDefFoundError: net/zanoria/nexus/NexusPlugin at resolveQueueService}. Der
+     * Wurf riss das ganze onEnable mit - und damit den Lobbyschutz.
+     */
     private QueueService resolveQueueService() {
-        Plugin plugin = getServer().getPluginManager().getPlugin("Nexus");
-        if (!(plugin instanceof NexusPlugin nexus)) {
+        try {
+            Plugin plugin = getServer().getPluginManager().getPlugin("Nexus");
+            if (!(plugin instanceof NexusPlugin nexus)) {
+                return null;
+            }
+            return nexus.getQueueService();
+        } catch (RuntimeException | LinkageError fehler) {
+            getSLF4JLogger().error(
+                    "ZanoriaLobby: Nexus liess sich nicht abfragen ({}). Die Warteschlange faellt"
+                            + " aus; der Rest der Lobby laeuft weiter.",
+                    fehler.toString());
             return null;
         }
-        return nexus.getQueueService();
     }
 
     private String environmentOrConfig(String environment, String path, String fallback) {
@@ -514,6 +568,9 @@ public final class ZanoriaLobby extends JavaPlugin implements Listener {
     }
 
     private void updateBossBars() {
+        if (queueService == null) {
+            return;
+        }
         updateFullQueueTimers();
 
         for (Player player : Bukkit.getOnlinePlayers()) {

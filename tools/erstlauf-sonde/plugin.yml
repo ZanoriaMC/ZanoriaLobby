@@ -1,0 +1,4 @@
+name: ErstlaufSonde
+version: '1.0'
+main: net.zanoria.lobby.sonde.Sonde
+api-version: '1.21'
