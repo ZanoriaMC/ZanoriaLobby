@@ -73,7 +73,7 @@ public final class ZanoriaLobby extends JavaPlugin implements Listener {
     public void onEnable() {
         saveDefaultConfig();
         getServer().getMessenger().registerOutgoingPluginChannel(this, QUEUE_CHANNEL);
-        // ⚠️ HIER STAND BIS ZUM 2026-09-03 EIN disablePlugin(this). Der Erstlauf hat gezeigt,
+        // ⚠️ HIER STAND BIS ZUM 2026-09-04 EIN disablePlugin(this). Der Erstlauf hat gezeigt,
         // was das kostet, und der Befund ist groesser als eine Verdrahtungsfrage:
         //
         //   Nexus braucht MySQL (127.0.0.1:3308). Faellt die Datenbank aus, schaltet Nexus sich
@@ -81,7 +81,7 @@ public final class ZanoriaLobby extends JavaPlugin implements Listener {
         //   mitsamt LOBBYSCHUTZ, Hotbar und Menues. In einer Lobby im Ueberlebensmodus heisst
         //   das: kein Blockschutz, weil eine DATENBANK weg ist.
         //
-        // Gemessen am 2026-09-03, woertlich aus dem Erstlaufprotokoll:
+        // Gemessen am 2026-09-04, woertlich aus dem Erstlaufprotokoll:
         //   [Nexus] Database connection failed: Access denied for user 'root'@'172.19.0.1'
         //   [Nexus] Nexus failed to start - disabling.
         //   [ZanoriaLobby] NoClassDefFoundError: net/zanoria/nexus/NexusPlugin
@@ -242,7 +242,7 @@ public final class ZanoriaLobby extends JavaPlugin implements Listener {
      * NexusPlugin} die Klasse - und das wirft {@code NoClassDefFoundError}, einen
      * {@code Error}. Ein {@code catch (Exception)} liesse ihn durch.
      *
-     * <p>Gemessen am 2026-09-03 im Erstlauf, woertlich:
+     * <p>Gemessen am 2026-09-04 im Erstlauf, woertlich:
      * {@code NoClassDefFoundError: net/zanoria/nexus/NexusPlugin at resolveQueueService}. Der
      * Wurf riss das ganze onEnable mit - und damit den Lobbyschutz.
      */

@@ -32,7 +32,7 @@ PAPERAPI="$(find "$HOME/.gradle/caches/modules-2/files-2.1/io.papermc.paper" \
     -name 'paper-api-1.21.11-R0.1-SNAPSHOT.jar' 2>/dev/null | grep -v sources | head -1)"
 # ⚠️ paper-api allein reicht NICHT zum Uebersetzen: JavaPlugin erbt ueber Bukkits
 #    Schnittstellen von net.kyori.adventure.key.Namespaced, und javac verlangt die
-#    Klassendatei. Gemessen am 2026-09-03: "Kein Zugriff auf Namespaced". Die
+#    Klassendatei. Gemessen am 2026-09-04: "Kein Zugriff auf Namespaced". Die
 #    ausgelieferte paper.jar bringt Adventure zur LAUFZEIT mit - der Uebersetzer
 #    sieht sie nicht.
 ADV_KEY="$(find "$HOME/.gradle/caches/modules-2/files-2.1/net.kyori" \
@@ -42,7 +42,7 @@ ADV_API="$(find "$HOME/.gradle/caches/modules-2/files-2.1/net.kyori" \
 # ⚠️ WINDOWS-PFADE, mit Semikolon getrennt. javac ist hier das Windows-JDK: bei EINEM
 #    Pfad schreibt MSYS ihn automatisch um, bei einer mit ';' getrennten LISTE nicht
 #    mehr - dann meldet es "Package org.bukkit ist nicht vorhanden", und das sieht aus
-#    wie ein fehlendes paper-api statt wie ein Pfadproblem. Am 2026-09-03 gemessen.
+#    wie ein fehlendes paper-api statt wie ein Pfadproblem. Am 2026-09-04 gemessen.
 winpfad() { cygpath -w "$1" 2>/dev/null || echo "$1"; }
 SONDENPFAD="$(winpfad "$PAPERAPI");$(winpfad "$ADV_KEY");$(winpfad "$ADV_API")"
 
@@ -178,7 +178,7 @@ server_toeten() {
 
 fahren() {
     echo "── Lauf ─────────────────────────────────────────────────────────"
-    # ⚠️ ZUERST auf den freien Port warten. Am 2026-09-03 gemessen: der zweite Lauf
+    # ⚠️ ZUERST auf den freien Port warten. Am 2026-09-04 gemessen: der zweite Lauf
     #    direkt nach dem ersten scheiterte mit "FAILED TO BIND TO PORT", der Server
     #    stuerzte ab - und die Auswertung meldete daraufhin NEUN rote Punkte, die alle
     #    wie Codefehler aussahen. Ein Umgebungsproblem muss sich als solches melden,
@@ -193,7 +193,7 @@ fahren() {
     # ⚠️ exec, damit $! WIRKLICH der Java-Prozess ist und nicht die Subshell. Ohne das traf
     #    das kill nur die Huelle: der Server lief weiter, hielt Port und Jars fest, und der
     #    NAECHSTE Lauf scheiterte am Binden - was dann wie ein Codefehler aussah.
-    #    Am 2026-09-03 genau so passiert, zweimal.
+    #    Am 2026-09-04 genau so passiert, zweimal.
     ( cd "$LAUF" && printf 'stop\n' | exec "$JDK/bin/java" -Xmx1G -jar paper.jar --nogui \
         > "$LAUF/konsole.log" 2>&1 ) &
     local pid=$!
@@ -214,7 +214,7 @@ fahren() {
     #    Lauf misst dann nichts.
     # ⚠️ GEZIELT ueber die KOMMANDOZEILE, nicht ueber $pid und nicht ueber den Namen.
     #    $pid ist die Bash-PID und nicht die Windows-PID - ein taskkill /PID darauf trifft
-    #    nichts (am 2026-09-03 gemessen: der Server lief weiter). Und /IM java.exe wuerde
+    #    nichts (am 2026-09-04 gemessen: der Server lief weiter). Und /IM java.exe wuerde
     #    den GRADLE-DAEMON mit abschiessen, der daneben laeuft.
     #    Erkannt wird er an "-jar paper.jar"; das trifft nur diesen Wegwerf-Server.
     server_toeten
@@ -271,7 +271,7 @@ auswerten() {
         # ⚠️ NULL DEKLARIERTE IST KEIN ERFOLG. Die erste Fassung meldete bei
         #    "0 deklariert, 0 gebunden, 0 ungebunden" ein OK - ein leerer Sucher, der
         #    Erfolg meldet, und zwar im Werkzeug, das genau davor schuetzen soll.
-        #    Gemessen am 2026-09-03: als ZanoriaLobby gar nicht hochkam, stand hier OK.
+        #    Gemessen am 2026-09-04: als ZanoriaLobby gar nicht hochkam, stand hier OK.
         if echo "$zeile" | grep -qE ': 0 deklariert'; then
             fehl "4  ${zeile#*SONDE-EREIGNISBINDUNG: } - NULL deklarierte Griffe sind kein Befund, sondern ein leerer Sucher"
         elif echo "$zeile" | grep -q ", 0 ungebunden"; then
