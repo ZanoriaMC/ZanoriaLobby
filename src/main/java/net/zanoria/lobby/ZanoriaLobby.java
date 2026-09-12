@@ -1,5 +1,6 @@
 package net.zanoria.lobby;
 
+import net.zanoria.lobby.warteschlange.Warteschlangentakt;
 import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -134,7 +135,12 @@ public final class ZanoriaLobby extends JavaPlugin implements Listener {
         getServer().getPluginManager().registerEvents(new Hotbarausgabe(getSLF4JLogger()), this);
 
         if (warteschlangeLaeuft) {
-            bossBarTask = getServer().getScheduler().runTaskTimer(this, this::updateBossBars, 20L, 20L);
+            // ⚠️ Standing Rule 1: der Takt liest jede Sekunde Redis - getQueueSize je Modus
+            // und getEntry je Online-Spieler. Synchron registriert (bis 2026-09-06
+            // runTaskTimer) blockierte das den Hauptthread unbedingt, auch wenn niemand
+            // wartet, mit Kosten in Spielerzahl x Modianzahl.
+            bossBarTask = getServer().getScheduler()
+                    .runTaskTimerAsynchronously(this, this::updateBossBars, 20L, 20L);
 
             LobbyNpcCommand npcCommand = new LobbyNpcCommand();
             var cmd = getCommand("lobbynpc");
@@ -224,9 +230,16 @@ public final class ZanoriaLobby extends JavaPlugin implements Listener {
         if (queueService == null) {
             return;
         }
-        if (queueService.isQueued(event.getPlayer().getUniqueId())) {
-            showQueueBar(event.getPlayer());
-        }
+        // ⚠️ Standing Rule 1: isQueued liegt hinter Redis. Auf dem Hauptthread haette jeder
+        // Beitritt daran gehangen - und beim Redis-Ausfall an der Zeitgrenze des Pools.
+        Player beigetreten = event.getPlayer();
+        Warteschlangentakt.fahreAktion(spurwechsel(),
+                () -> queueService.isQueued(beigetreten.getUniqueId()),
+                imWartestand -> {
+                    if (Boolean.TRUE.equals(imWartestand)) {
+                        showQueueBar(beigetreten);
+                    }
+                });
     }
 
     @EventHandler
@@ -484,21 +497,41 @@ public final class ZanoriaLobby extends JavaPlugin implements Listener {
         return null;
     }
 
+    /**
+     * ⚠️ Standing Rule 1, die haeufigste Spieleraktion der Lobby. {@code isQueued}, {@code leave}
+     * und {@code join} liegen hinter {@code RedisQueueStore.withLock} — einer netzweiten Sperre
+     * mit bis zu 2 s Spin, waehrend der Matchmaker dieselbe Sperre alle 250 ms anfasst. Bis zum
+     * 2026-09-06 lief das blockierend auf dem Hauptthread.
+     *
+     * <p>{@code sendQueueRequest} bleibt bewusst auf der Hauptspur: es ist
+     * {@code player.sendPluginMessage} an Velocity und blockiert nicht.
+     */
     private void joinQueue(Player player, QueueNpcDefinition npc) {
+        UUID playerId = player.getUniqueId();
+        Warteschlangentakt.fahreAktion(spurwechsel(),
+                () -> queueService.isQueued(playerId),
+                imWartestand -> beitrittFortsetzen(player, npc, Boolean.TRUE.equals(imWartestand)));
+    }
+
+    /** Hauptspur: entscheiden und melden; was noch einmal Redis braucht, geht wieder abseits. */
+    private void beitrittFortsetzen(Player player, QueueNpcDefinition npc, boolean imWartestand) {
         UUID playerId = player.getUniqueId();
 
         // Bereits in einer Queue → verlassen
-        if (queueService.isQueued(playerId)) {
+        if (imWartestand) {
             if (sendQueueRequest(player, npc, false)) {
                 hideQueueBar(player);
                 t(player, "lobby.queue.left").send();
                 updateBossBars();
                 return;
             }
-            queueService.leave(playerId);
-            hideQueueBar(player);
-            t(player, "lobby.queue.left").send();
-            updateBossBars();
+            Warteschlangentakt.fahreAktion(spurwechsel(),
+                    () -> queueService.leave(playerId),
+                    ignoriert -> {
+                        hideQueueBar(player);
+                        t(player, "lobby.queue.left").send();
+                        updateBossBars();
+                    });
             return;
         }
 
@@ -508,18 +541,22 @@ public final class ZanoriaLobby extends JavaPlugin implements Listener {
             return;
         }
 
-        if (!queueService.join(playerId, npc.queueType(), npc.mapId())) {
-            t(player, "lobby.queue.failed").send();
-            return;
-        }
-
-        var joinMsg = t(player, "lobby.queue.joined").variable("type", npc.queueType().getDisplayName());
-        if (npc.hasMap()) {
-            joinMsg.variable("map", npc.mapId());
-        }
-        joinMsg.send();
-        showQueueBar(player);
-        updateBossBars();
+        Warteschlangentakt.fahreAktion(spurwechsel(),
+                () -> queueService.join(playerId, npc.queueType(), npc.mapId()),
+                beigetreten -> {
+                    if (!Boolean.TRUE.equals(beigetreten)) {
+                        t(player, "lobby.queue.failed").send();
+                        return;
+                    }
+                    var joinMsg = t(player, "lobby.queue.joined")
+                            .variable("type", npc.queueType().getDisplayName());
+                    if (npc.hasMap()) {
+                        joinMsg.variable("map", npc.mapId());
+                    }
+                    joinMsg.send();
+                    showQueueBar(player);
+                    updateBossBars();
+                });
     }
 
     private boolean sendQueueRequest(Player player, QueueNpcDefinition npc, boolean joining) {
@@ -567,14 +604,76 @@ public final class ZanoriaLobby extends JavaPlugin implements Listener {
         }
     }
 
+    /**
+     * Ein Takt des Warteschlangen-Anzeigers.
+     *
+     * <p>⚠️ Standing Rule 1. Bis zum 2026-09-06 lief diese Methode synchron auf dem Hauptthread
+     * und las dabei jede Sekunde Redis: {@code getQueueSize} je Modus plus {@code getEntry} je
+     * Online-Spieler, unbedingt, auch wenn niemand wartet. Jetzt liegt das Lesen auf der
+     * Nebenspur — und weil Bukkits API nicht threadsicher ist, liegen die Spielerliste und
+     * jede BossBar-Aenderung weiterhin auf dem Hauptthread. Die Reihenfolge haelt
+     * {@link net.zanoria.lobby.warteschlange.Warteschlangentakt} fest, gemessen von
+     * {@code DieSpurdisziplinIstGemessenTest}.
+     */
     private void updateBossBars() {
         if (queueService == null) {
             return;
         }
-        updateFullQueueTimers();
+        Warteschlangentakt.fahre(spurwechsel(),
+                this::onlineSpielerIds,
+                this::warteschlangenstandLesen,
+                this::bossBarsAnwenden);
+    }
 
+    /** Die beiden Spuren, wie der Bukkit-Scheduler sie anbietet. */
+    private Warteschlangentakt.Ausfuehrung spurwechsel() {
+        return new Warteschlangentakt.Ausfuehrung() {
+            @Override
+            public void abseits(Runnable arbeit) {
+                getServer().getScheduler().runTaskAsynchronously(ZanoriaLobby.this, arbeit);
+            }
+
+            @Override
+            public void haupt(Runnable arbeit) {
+                getServer().getScheduler().runTask(ZanoriaLobby.this, arbeit);
+            }
+        };
+    }
+
+    /** Hauptspur: Bukkit fragen, wer online ist. */
+    private List<UUID> onlineSpielerIds() {
+        List<UUID> ids = new ArrayList<>();
         for (Player player : Bukkit.getOnlinePlayers()) {
-            QueueEntry entry = queueService.getEntry(player.getUniqueId());
+            ids.add(player.getUniqueId());
+        }
+        return ids;
+    }
+
+    /** Nebenspur: alles, was Redis anfasst — und sonst nichts. */
+    private Warteschlangenstand warteschlangenstandLesen(List<UUID> online) {
+        updateFullQueueTimers();
+        Map<QueueType, Integer> groessen = new HashMap<>();
+        for (QueueType type : QueueType.values()) {
+            groessen.put(type, queueService.getQueueSize(type));
+        }
+        Map<UUID, QueueEntry> eintraege = new HashMap<>();
+        Map<UUID, Long> wartezeiten = new HashMap<>();
+        for (UUID id : online) {
+            QueueEntry entry = queueService.getEntry(id);
+            if (entry != null) {
+                eintraege.put(id, entry);
+                // ⚠️ Auch getQueueTime ist Redis. Bis zum 2026-09-06 las displaySeconds es auf
+                // dem Hauptthread nach - der Takt war umgestellt, diese eine Zeile nicht.
+                wartezeiten.put(id, queueService.getQueueTime(id));
+            }
+        }
+        return new Warteschlangenstand(groessen, eintraege, wartezeiten);
+    }
+
+    /** Hauptspur: alles, was Bukkit anfasst — und sonst nichts. */
+    private void bossBarsAnwenden(Warteschlangenstand stand) {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            QueueEntry entry = stand.eintraege().get(player.getUniqueId());
             if (entry == null) {
                 hideQueueBar(player);
                 continue;
@@ -585,17 +684,26 @@ public final class ZanoriaLobby extends JavaPlugin implements Listener {
                 showQueueBar(player);
                 bossBar = queueBars.get(player.getUniqueId());
             }
+            if (bossBar == null) {
+                continue;
+            }
 
             QueueType type = entry.type();
-            int players = queueService.getQueueSize(type);
+            int players = stand.groessen().getOrDefault(type, 0);
             int maxPlayers = type.getMaxPlayers();
-            long seconds = displaySeconds(player.getUniqueId(), type);
+            long seconds = displaySeconds(type, stand.wartezeiten().getOrDefault(player.getUniqueId(), 0L));
             float progress = Math.min(1.0f, Math.max(0.0f, players / (float) maxPlayers));
 
             bossBar.name(queueTitle(type, players, maxPlayers, seconds));
             bossBar.progress(progress);
             bossBar.color(players >= maxPlayers ? BossBar.Color.GREEN : BossBar.Color.BLUE);
         }
+    }
+
+    /** Was ein Takt auf der Nebenspur gelesen hat. */
+    private record Warteschlangenstand(Map<QueueType, Integer> groessen,
+                                       Map<UUID, QueueEntry> eintraege,
+                                       Map<UUID, Long> wartezeiten) {
     }
 
     private void updateFullQueueTimers() {
@@ -609,14 +717,17 @@ public final class ZanoriaLobby extends JavaPlugin implements Listener {
         }
     }
 
-    private long displaySeconds(UUID playerId, QueueType type) {
+    /**
+     * ⚠️ Nimmt die Wartezeit als Wert entgegen, statt sie selbst zu lesen: der Aufrufer
+     * {@code bossBarsAnwenden} laeuft auf dem Hauptthread, und {@code getQueueTime} ist Redis.
+     */
+    private long displaySeconds(QueueType type, long queueTime) {
         Long fullSince = fullSinceByType.get(type);
         if (fullSince != null) {
             long elapsedSeconds = (System.currentTimeMillis() - fullSince) / 1000L;
             return Math.max(1L, 5L - elapsedSeconds);
         }
 
-        long queueTime = queueService.getQueueTime(playerId);
         return Math.max(0L, queueTime / 1000L);
     }
 
