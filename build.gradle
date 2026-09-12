@@ -23,17 +23,36 @@ def ideaProjectsRoot = providers.environmentVariable("IDEA_PROJECTS_DIR")
                 : "/mnt/c/Users/krinc/IdeaProjects")
         .get()
 
-def firstExistingFile(List<String> candidates) {
-    def match = candidates.collect { file(it) }.find { it.exists() }
-    return match != null ? match : file(candidates.first())
-}
-
 dependencies {
     compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
-    compileOnly(files(firstExistingFile([
-            "${ideaProjectsRoot}/Nexus/build/libs/Nexus-1.0-SNAPSHOT.jar",
-            "/home/corwis/zanoria/apps/Nexus.jar"
-    ])))
+
+    // ⚠️ Ueber die KOORDINATE, nicht ueber einen Dateipfad — dieselbe Entscheidung, die
+    // ZanLang eine Zeile tiefer schon traegt, und aus demselben Grund.
+    //
+    // Hier stand eine firstExistingFile-Kette mit zwei Kandidaten:
+    //     ${ideaProjectsRoot}/Nexus/build/libs/Nexus-1.0-SNAPSHOT.jar
+    //     /home/corwis/zanoria/apps/Nexus.jar          <- das AUSGELIEFERTE Jar
+    // und einem Rueckfall auf candidates.first(), also auf einen Pfad, der nicht existiert.
+    // Drei Schaeden daran:
+    //   1. Faellt Position 1 weg, greift STILLSCHWEIGEND das ausgelieferte Jar aus dem
+    //      Betriebsordner. Das ist beliebig alt, und der Bau wird gruen.
+    //   2. Existiert keiner der beiden, liefert firstExistingFile einen NICHT existierenden
+    //      Pfad. files(...) auf eine fehlende Datei traegt einfach nichts bei - der Bau
+    //      uebersetzt dann OHNE Nexus-API und meldet "package net.zanoria.nexus does not
+    //      exist", ohne zu sagen, dass ein Jar fehlt.
+    //   3. Der Pfad haengt an ideaProjectsRoot, also an C:/Users/krinc/IdeaProjects bzw.
+    //      /mnt/c/... - nach einem Umzug zeigen BEIDE Zweige ins Leere.
+    //
+    // Die Koordinate ist rename-fest: Nexus/build.gradle:436 setzt artifactId = 'nexus-core'.
+    // Nachgemessen am 2026-09-12: nexus-core-1.0-SNAPSHOT.jar liegt in mavenLocal und traegt
+    // alle vier Typen, die dieses Repo benutzt (NexusPlugin, queue.QueueEntry,
+    // queue.QueueService, queue.QueueType).
+    //
+    // ⚠️ Die Gefahr "veraltetes Jar uebersetzt gruen" bleibt — sie ist nur nicht mehr
+    // versteckt. Der Waechter unter dependencies macht sie sichtbar, statt sie zu heilen;
+    // heilen koennte sie nur ein includeBuild, und das scheitert hier an paperweight
+    // (siehe settings.gradle, am 2026-08-15 fuer ZanLang gemessen).
+    compileOnly "net.zanoria:nexus-core:1.0-SNAPSHOT"
     // ⚠️ Ueber die KOORDINATE, nicht ueber einen Dateipfad. Hier stand eine
     // firstExistingFile-Kette auf "Corox Lang-1.0.jar" mit zwei Rueckfaellen.
     // Zwei Schaeden daran, beide am 2026-08-15 belegt:
@@ -55,6 +74,81 @@ dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
+
+/**
+ * ⚠️ LAUTER ABBRUCH STATT STILLER ABWESENHEIT — und warum als VORGESCHALTETE Aufgabe.
+ *
+ * Erster Versuch war ein {@code doFirst} auf {@code compileJava}, das
+ * {@code configurations.compileClasspath} befragt. Gemessen am 2026-09-12: der Zweig ist
+ * TOTER CODE. Bei einer unaufloesbaren Koordinate wirft Gradle schon beim Aufloesen des
+ * Klassenpfads, bevor {@code doFirst} laeuft:
+ *
+ *     Could not resolve all files for configuration ':compileClasspath'.
+ *       > Could not find net.zanoria:nexus-core:...
+ *
+ * Das ist selbst ein lauter Abbruch und nennt sogar den durchsuchten mavenLocal-Pfad — aber
+ * nicht die Abhilfe. Deshalb steht die Pruefung jetzt in einer Aufgabe, von der
+ * {@code compileJava} abhaengt: Aufgabenabhaengigkeiten laufen VOR der abhaengigen Aufgabe,
+ * also vor dem Aufloesen.
+ *
+ * ⚠️ Geprueft wird die DATEI in mavenLocal, nicht die Konfiguration — genau darum geht es.
+ */
+tasks.register('pruefeNexusArtefakt') {
+    description = 'Bricht laut ab, wenn nexus-core fehlt, und warnt laut, wenn es veraltet ist.'
+    doLast {
+        def jar = file("${System.getProperty('user.home')}/.m2/repository/net/zanoria/nexus-core/1.0-SNAPSHOT/nexus-core-1.0-SNAPSHOT.jar")
+        if (!jar.exists()) {
+            throw new GradleException("""
+                |⚠️ nexus-core fehlt in mavenLocal:
+                |     ${jar}
+                |
+                |   Zu tun, im Nachbarcheckout Nexus:
+                |       ./gradlew publishToMavenLocal
+                |
+                |   ⚠️ Warum das ein Abbruch ist und keine Warnung: bis zum 2026-09-12 stand
+                |   hier eine firstExistingFile-Kette. Fiel ihr erster Kandidat weg, griff
+                |   STILLSCHWEIGEND /home/corwis/zanoria/apps/Nexus.jar - das AUSGELIEFERTE
+                |   Jar, beliebig alt, Bau gruen. Fehlten beide, trug files(...) einfach
+                |   nichts bei und der Compiler meldete "package net.zanoria.nexus does not
+                |   exist" - eine Meldung, die nach einem Tippfehler im Import aussieht.
+                """.stripMargin().trim())
+        }
+
+        // ── Alterspruefung. Nur wenn der Nachbarcheckout da ist; fehlt er, entfaellt der
+        //    Hinweis, statt falsch zu sein.
+        def quellen = file("${ideaProjectsRoot}/Nexus/src/main/java")
+        if (!quellen.isDirectory()) {
+            return
+        }
+        def neueste = 0L
+        quellen.eachFileRecurse { f ->
+            if (f.name.endsWith('.java') && f.lastModified() > neueste) {
+                neueste = f.lastModified()
+            }
+        }
+        if (neueste <= jar.lastModified()) {
+            return
+        }
+        def tage = ((neueste - jar.lastModified()) / 86400000L) as long
+        logger.warn("""
+            |⚠️⚠️ nexus-core in mavenLocal ist AELTER als die Nexus-Quellen.
+            |     Jar:     ${new Date(jar.lastModified())}
+            |     Quelle:  ${new Date(neueste)}   (${tage} Tag(e) neuer)
+            |
+            |     Dieser Bau wird GRUEN und traegt eine veraltete API; der Fehler zeigt sich
+            |     erst zur Laufzeit. Belegt am 2026-09-12: das Jar trug
+            |     DatabaseManager\$PoolStand - den Namen VOR dem Umbau vom selben Tag.
+            |
+            |     Im Nexus-Checkout:  ./gradlew publishToMavenLocal
+            |
+            |     ⚠️ Kein Abbruch: er traefe jeden Bau, dem nicht gerade ein
+            |     publishToMavenLocal vorausging - also fast jeden -, und ein Waechter, der
+            |     immer ausschlaegt, wird abgeschaltet statt gelesen.
+            """.stripMargin())
+    }
+}
+
+tasks.named('compileJava') { dependsOn 'pruefeNexusArtefakt' }
 
 shadowJar {
     relocate 'redis.clients', 'net.zanoria.lobby.libs.jedis'
