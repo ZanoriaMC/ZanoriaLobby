@@ -54,6 +54,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class ZanoriaLobby extends JavaPlugin implements Listener {
 
@@ -63,7 +64,26 @@ public final class ZanoriaLobby extends JavaPlugin implements Listener {
 
     private final Map<String, QueueNpcDefinition> npcs = new HashMap<>();
     private final Map<UUID, BossBar> queueBars = new HashMap<>();
-    private final Map<QueueType, Long> fullSinceByType = new HashMap<>();
+    /**
+     * ⚠️ <b>ConcurrentHashMap, nicht HashMap</b> — und das haengt an 8b6feaa.
+     *
+     * <p>Bis dahin lief alles auf dem Hauptthread, da war eine {@code HashMap} richtig. Seit der
+     * Takt die Spuren trennt, wird diese Karte auf der <b>Nebenspur geschrieben</b>
+     * ({@code updateFullQueueTimers}: {@code putIfAbsent}/{@code remove}) und auf der
+     * <b>Hauptspur gelesen</b> ({@code displaySeconds}: {@code get}).
+     *
+     * <p>Dass sich das ueberlappt, ist nicht hypothetisch: {@code updateBossBars} schedult
+     * weiter und kehrt sofort zurueck, die Kette laeuft ueber Scheduler-Spruenge. Der
+     * Redis-Teil darf hinter {@code RedisQueueStore.withLock} bis zu <b>2 s</b> spinnen, der
+     * Takt feuert aber jede <b>Sekunde</b> — Tick N liest also noch, waehrend Tick N+1 schon
+     * schreibt. Genau die Sperrenlast, gegen die 8b6feaa gebaut wurde, ist die Bedingung dafuer.
+     *
+     * <p>⚠️ {@code null} darf hier nie hinein — {@code ConcurrentHashMap} verbietet es. Gepruefte
+     * Zugriffe: {@code putIfAbsent(type, now)} mit einem {@code long}, {@code remove(type)},
+     * {@code get(type)}. Ein {@code get} auf einen fehlenden Schluessel liefert weiterhin
+     * {@code null}, und {@code displaySeconds} rechnet damit.
+     */
+    private final Map<QueueType, Long> fullSinceByType = new ConcurrentHashMap<>();
 
     private BukkitTask bossBarTask;
     private QueueService queueService;
